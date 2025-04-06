@@ -19,7 +19,7 @@
 
 以下是项目开发流程图：
 
-![](C:\Users\admin\Downloads\schedule.drawio.png)
+![](schedule.png)
 
 受课程和课题组要求影响，进度上可能存在一定差异，阶段之间不是完全的分离，大约存在一周左右的过渡时间。
 
