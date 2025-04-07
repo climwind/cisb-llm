@@ -20,14 +20,15 @@ class Evaluator(Agent):
     def gather_prompt(self, **kwargs):
 
         self.prompt = 'You are an software security expert, evaluate and conclude the result of bug report analysis.' \
-        '\nThe result consists of the longer [Reasoning process] and the shorter [Generated summary].' \
-        '\nYou need to reflect the [Reasoning process] then extract all the reasoning chains and list them clearly.' \
+        '\nThe result consists of the longer [Reasoning Process] and the shorter [Generated Summary].' \
+        '\nYou need to reflect the [Reasoning Process] then extract all the reasoning chains and list them clearly.' \
         '\nThen: ' \
         '\n1. Conclude the exact optimization behavior within 15 words.'\
         '\n2. State the security consequences within 15 words' \
         '\n3. Rephrase the eventual conclusion in one sentence within 15 words.' \
-        '\nAccording to the reflection, you should re-evaulate the bug report analysis classification and label\'s validity.' \
-        '\nIf compiler\'s behavior led to the bug, then consider if the bug is security related.' \
+        '\nAccording to the reflection, you should re-evaulate the bug report analysis and label\'s validity.' \
+        '\nIf the bug is security-related, you should describe the specific scenario. '
+        #'\nIf compiler\'s behavior led to the bug, then consider if the bug is security related.' \
         '\nIf compiler\'s optimization is based on the No-UB assumption, then the generated code may also contain security implications.'
 
         
@@ -39,7 +40,7 @@ class Evaluator(Agent):
                 {"role": "system", "content": self.prompt},
                 {"role": "user", "content": str(input)},
         ],
-            max_tokens=1024,
+            max_tokens=2048,
             temperature=0.7,
             # response_format={'type': 'json_object'},
             stream=False

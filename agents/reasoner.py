@@ -22,7 +22,8 @@ class Reasoner(Agent):
         self.template = {
             'static': {
                 'role': 'You are an expert in the field of software and system security.',
-                'task': 'Your task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether compiler introduced a silent bug in the code.',
+                'task': 'Your task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether compiler introduced a CISB.',
+                'definition': 'If the compiler\'s optimization induced a security-related bug in the code, then it is CISB.',
                 'description': 'The report will contain bug id, title, digested description and code, formed as a json.',
                 'requirement': 'Please be careful not to overthink, nor do you need to suggest anything.'
             },
@@ -32,8 +33,9 @@ class Reasoner(Agent):
                 'user expecting behavior': 'First, You need to infer the intention based on the desciptions and code in the digest, and analyze the expection of the user.',
                 'compiler behavior': 'Then, integrate the code and output results to obtain the actual behavior of the compiler. For example, whether the compiler has optimizations, what platform it is applied to, and what version it is.',
                 'problem analysis': 'Summary the gap between expectations and reality based on the above information.',
-                'tentative classification': 'After analyzing the problem, try to classify the bug report, explain the reasons for each point, judge if compiler introduced the bug.',
-                'early termination': 'If you cannot draw a determinative conclusion, please end the inference directly and report the exception.'
+                'primary label': 'After analyzing the problem, try to judge if compiler induced a CISB.',
+                'early termination': 'If you cannot draw a determinative conclusion, please end the inference directly and report the exception.',
+                'emphasis': 'Remember we do not care if compiler contains a bug, but if the bug in code is introduced by compiler.'
                 #'summarize and suggest': 'In the end, summarize the information and effectiveness provided by the bug report in one to two sentences, and point out the best practices.'
             }
         }
@@ -77,7 +79,7 @@ class Reasoner(Agent):
                 {"role": "system", "content": self.prompt},
                 {"role": "user", "content": str(report)},
         ],
-            max_tokens=1024,
+            max_tokens=4096,
             temperature=0.7,
             stream=False
         )
@@ -97,7 +99,7 @@ class Reasoner(Agent):
         response = client.chat.completions.create(
             model="",
             messages=messages,
-            max_tokens=1024,
+            max_tokens=4096,
             temperature=0.7,
             stream=False
         )
