@@ -35,7 +35,8 @@ class Reasoner(Agent):
                 'problem analysis': 'Summary the gap between expectations and reality based on the above information.',
                 'primary label': 'After analyzing the problem, try to judge if compiler induced a CISB.',
                 'early termination': 'If you cannot draw a determinative conclusion, please end the inference directly and report the exception.',
-                'emphasis': 'Remember we do not care if compiler contains a bug, but if the bug in code is introduced by compiler.'
+                'emphasis': 'Remember we do not care if compiler contains a bug, but if the bug in code is introduced by compiler.',
+                'reduce hallucination': 'User\'s code is not necessarily valid according to language standards, nor his expectation. So Your reasoning do not need to rely on his expectations.'
                 #'summarize and suggest': 'In the end, summarize the information and effectiveness provided by the bug report in one to two sentences, and point out the best practices.'
             }
         }
