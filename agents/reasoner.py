@@ -35,7 +35,7 @@ class Reasoner(Agent):
                 'problem analysis': 'Summary the gap between user valid expectations and assumption of compiler optimization based on the above information.',
                 'gap analysis': 'If the reported bug is caused by the gap, and it may have security implications(such as check removed, endless loop, etc.), then it is a [CISB].',
                 'primary label': 'After analyzing the problem, try to judge if CISB exists.',
-                'early termination': 'If you cannot draw a determinative conclusion, please end the inference directly and report the exception.',
+                'early termination': 'If the report lacks source code, please end the inference directly and report the exception.',
                 'emphasis': '\n[Requirement 2]\n Remember we do not care if compiler contains a bug, but if the CISB exists in the code.',
                 'reduce hallucination': '\n[Requirement 3]\n User\'s code is not necessarily valid according to language standards, nor his expectation. So Your reasoning do not need to rely on his expectations.'
                 #'summarize and suggest': 'In the end, summarize the information and effectiveness provided by the bug report in one to two sentences, and point out the best practices.'
