@@ -30,10 +30,10 @@ class Reasoner(Agent):
             'CoT': {
                 'beginning': 'Let us think step by step.',
                 #'draw problem desc': 'Firstly, you need to rephrase the situation described by the reporter as a standardized expression in the computer industry, summarizing its issues within 100 words. If the amount of information in the first comment is too low or the content is confusing, end the inference directly and report the exception.',
-                'user expecting behavior': 'First, You need to infer the intention based on the desciptions and code in the digest, and analyze the expection of the user.',
+                'user expecting behavior': 'First, You need to infer the intention based on the descriptions and code in the digest, and analyze the expectation of the user.',
                 'compiler behavior': 'Then, focus on the code and output results to obtain the actual behavior of the compiler. For example, whether the compiler has optimizations, what platform it is applied to, and what version it is.',
-                'problem analysis': 'Summary the gap between user valid expectations and assumption of compiler optimization based on the above information.',
-                'gap analysis': 'If the reported bug is caused by the gap, and it has caused security implications(such as check removed, endless loop, etc.), then it is a [CISB].',
+                'problem analysis': 'Summary if there is conflict between user valid expectations and assumption of compiler optimization based on the above information.',
+                'gap analysis': 'If the reported bug is caused by the conflict, and it has already caused security implications(such as check removed, endless loop, etc.), then it is a CISB.',
                 'primary label': 'After analyzing the problem, try to judge if CISB exists.',
                 'early termination': 'If the report lacks enough source code, please end the inference directly and report the exception.',
                 'emphasis': '\n[Requirement 2]\n Remember we do not care if compiler contains a bug, but if the CISB exists in the code.',
