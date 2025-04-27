@@ -52,7 +52,7 @@ class Reasoner(Agent):
         \n\nLet us reason about it step by step.
         \n[Step 1]: First check if the given code conforms to what he issues. If no, terminate early.
         \n[Step 2]: Based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them through call chains. Reason about the approximate location which caused the differences.
-        \n[Step 3]: Focus on the located code block, then analyse possible optimization of the compiler. You must verify your suppose by referencing the common knowledge of compiler optimization.
+        \n[Step 3]: Focus on the located code block, then analyse possible optimization of the compiler. You must verify your suppose by referencing the common knowledge of compiler optimization. Do not rush to a conclusion.
         \n[Step 4]: Summary if there is conflict between the expecting functionality of that block and assumption of the confirmed compiler optimization it makes. 
         \n[Step 5]: Judge if the reported function failure is caused by the conflict, and it may have security implications(such as check removed, endless loop, etc.).
         \n\nAfter reasoning, answer the following questions with [yes/no] and one sentence explanation:
