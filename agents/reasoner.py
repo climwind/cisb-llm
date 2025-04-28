@@ -52,15 +52,15 @@ class Reasoner(Agent):
         \n\nLet us reason about it step by step.
         \n[Step 1]: First check if the given code conforms to what he issues. If no, terminate early.
         \n[Step 2]: Based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them through call chains. Reason about the approximate location which caused the differences.
-        \n[Step 3]: Focus on the located code block, then analyse possible optimization of the compiler. You must verify your suppose by referencing the common knowledge of compiler optimization. Do not rush to a conclusion.
-        \n[Step 4]: Summary if there is conflict between the expecting functionality of that block and assumption of the confirmed compiler optimization it makes. 
-        \n[Step 5]: Judge if the reported function failure is caused by the conflict, and it may have security implications(such as check removed, endless loop, etc.).
+        \n[Step 3]: Focus on the located code block, then analyse possible optimization done by compiler. Optimization is after  tokenization, syntax and semantics phases. Do not rush to a conclusion.
+        \n[Step 4]: Summary if there is conflict between the expecting code functionality and assumption of the compiler optimization it made. 
+        \n[Step 5]: Judge if the reported function failure is caused by the conflict, and it may have security implications(such as check removed, endless loop, etc.). It should not be just side effects.
         \n\nAfter reasoning, answer the following questions with [yes/no] and one sentence explanation:
         \n1. Does the report include source code?
         \n2. Does the given source code conform to his intention? 
-        \n3. Is the issue a runtime bug by compiler's optimization, not a compilation failure? 
+        \n3. Is the issue a runtime bug by compiler's optimization, not a compilation failure in other phases? 
         \n4. Caused by the conflict between user expectation and assumption compiler made to do optimization? 
-        \n5. Does the bug have security implications in the context?
+        \n5. Does the bug have direct security implications in the context?
         \nIf the questions are all [yes], then it is a CISB.
         """
         # for key in kwargs:
