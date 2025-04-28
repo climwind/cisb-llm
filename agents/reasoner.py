@@ -58,7 +58,7 @@ class Reasoner(Agent):
         \n\nAfter reasoning, answer the following questions with [yes/no] and one sentence explanation:
         \n1. Does the report include source code?
         \n2. Does the given source code conform to his intention? 
-        \n3. Is the issue a runtime bug by compiler's optimization, not a compilation failure in other phases? 
+        \n3. Is the issue a program runtime bug caused by optimization, not a compilation failure in other phases? 
         \n4. Caused by the conflict between user expectation and assumption compiler made to do optimization? 
         \n5. Does the bug have direct security implications in the context?
         \nIf the questions are all [yes], then it is a CISB.
