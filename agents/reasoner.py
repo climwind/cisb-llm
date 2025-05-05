@@ -45,23 +45,23 @@ class Reasoner(Agent):
     def gather_prompt(self, **kwargs):
         self.prompt = """You are an expert in the field of software and system security.
         \nYour task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether the code contains [CISB].
-        \n[Bug Report Structure]: The report contains bug id, title, digested description and code logical blocks, formed as json.
-        \n[Requirement 1]: Do not overthink, nor do you need to suggest.
-        \n[Requirement 2]: If lacking enough source code, end the inference directly and report the exception.
+        \n[Bug Report Structure]: The report contains bug id, title, digested description, code logical blocks and review from Bugzilla developers, formed as json.
+        \n[Requirement 1]: Do not overthink or recommend anything.
+        \n[Requirement 2]: If lacking enough source code, end the inference directly and raise exception.
         \n[Requirement 3]: Do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.
         \n\nLet us reason about it step by step.
         \n[Step 1]: First check if the given code conforms to what he issues. If no, terminate early.
         \n[Step 2]: Based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them through call chains. Reason about the approximate location which caused the differences.
-        \n[Step 3]: Focus on the located code block, then analyse possible optimization done by compiler. Optimization is after  tokenization, syntax and semantics phases. Do not rush to a conclusion.
+        \n[Step 3]: Focus on the located code block, analyse possible optimization done by compiler. Optimization is after tokenization, syntax and semantics phases. Do not rush to a conclusion.
         \n[Step 4]: Summary if there is conflict between the expecting code functionality and assumption of the compiler optimization it made. 
         \n[Step 5]: Judge if the reported function failure is caused by the conflict, and it may have security implications(such as check removed, endless loop, etc.). It should not be just side effects.
         \n\nAfter reasoning, answer the following questions with [yes/no] and one sentence explanation:
-        \n1. Does the report include source code?
+        \n1. Combining developer review, did programmer misuse/misunderstand some language or compiler features?
         \n2. Does the given source code conform to his intention? 
         \n3. Is the issue a program runtime bug caused by optimization, not a compilation failure in other phases? 
         \n4. Caused by the conflict between user expectation and assumption compiler made to do optimization? 
         \n5. Does the bug have direct security implications in the context?
-        \nIf the questions are all [yes], then it is a CISB.
+        \nIf answers are [no, yes, yes, yes, yes], then it is a CISB.
         """
         # for key in kwargs:
         #     for k in self.template[key]:

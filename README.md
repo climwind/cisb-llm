@@ -173,7 +173,110 @@
 
 ![来源https://blog.csdn.net/kunpengtingting/article/details/140995026](prompt.jpeg)
 
+## 2.5 Version
+
+2.5 版本主要提高了 LLM 代码分析能力，部分解决推理过程偷懒、短路价值判断、安全理解不到位等问题。提高了分类准确度，并有效降低误报率。按照 OpenAI doc 重构了 prompt 格式。
+
+改进思路：使用模块化分解代码、根据调用链追踪可疑变量和函数、针对输出信息精确定位，引导模型先聚焦，后分析。
+
+具体修改：修改 Digestor，先总结【用户预期】、【输出差异】，不让模型直接找 bug，而是让它将代码分成多个逻辑块，总结每个块功能。调整 Reasoner，让它推理 Digestor 生成的代码逻辑块，结合用户预取和输出差异判断最有可能导致 bug 的块，之后聚焦分析这一段的实现预期和优化冲突。
+
+为了缓解模型幻觉，长上下文遗忘问题，考虑将 CISB 语义分解。在基于模块化代码分析的基础上，添加多层次问答机制，实现自动化分析结果评估，并缓解遗忘降低 FP。经过三轮测试，最终 FPR 稳定在 35% 左右，相比降低了 15%。
+
+### Digestor
+
+"""
+
+You are an expert bug report extraction assistant. Analyze the given bug report and extract key information in JSON format.
+        \nThe report will contain bug id, summary, status, first comment information, formed as a json. 
+        \nRephrase reporter's description as a standardized expression in the computer science field.
+        \nFirst focus on the provided source code, try to divide it into some logical blocks, summarize their utilities.
+        \nThen, associate the code with reporter's description, conclude user's expectation and the differences from it according to the output.
+        \nOutput should include following information, constructed as a json: \n{
+[id]: The bug id of the report.
+        [title]: The title of the report, stored as-is.
+        [user expectation]: 
+        [difference]: 
+        [code block1]: {[functionality], [code]}
+        [code block2]: {[functionality], [code]}
+        ...\n}
+
+"""
+
+### Reasoner
+
+"""
+
+You are an expert in the field of software and system security.
+
+​    \nYour task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether the code contains [CISB].
+
+​    \n[Bug Report Structure]: The report contains bug id, title, digested description and code logical blocks, formed as json.
+
+​    \n[Requirement 1]: Do not overthink, nor do you need to suggest.
+
+​    \n[Requirement 2]: If lacking enough source code, end the inference directly and report the exception.
+
+​    \n[Requirement 3]: Do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.
+
+​    \n\nLet us reason about it step by step.
+
+​    \n[Step 1]: First check if the given code conforms to what he issues. If no, terminate early.
+
+​    \n[Step 2]: Based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them through call chains. Reason about the approximate location which caused the differences.
+
+​    \n[Step 3]: Focus on the located code block, then analyse possible optimization done by compiler. Optimization is after  tokenization, syntax and semantics phases. Do not rush to a conclusion.
+
+​    \n[Step 4]: Summary if there is conflict between the expecting code functionality and assumption of the compiler optimization it made. 
+
+​    \n[Step 5]: Judge if the reported function failure is caused by the conflict, and it may have security implications(such as check removed, endless loop, etc.). It should not be just side effects.
+
+​    \n\nAfter reasoning, answer the following questions with [yes/no] and one sentence explanation:
+
+​    \n1. Does the report include source code?
+
+​    \n2. Does the given source code conform to his intention? 
+
+​    \n3. Is the issue a program runtime bug caused by optimization, not a compilation failure in other phases? 
+
+​    \n4. Caused by the conflict between user expectation and assumption compiler made to do optimization? 
+
+​    \n5. Does the bug have direct security implications in the context?
+
+​    \nIf the questions are all [yes], then it is a CISB.
+
+​    """
+
+### Evaluator
+
+"""
+
+You are an software security expert, evaluate and check the result of bug report analysis. 
+
+​    \nThe result consists of the longer [Reasoning Process] and the shorter [Generated Summary].
+
+​    \nYou need to reflect the [Reasoning Process] then determine whether CISB exists.
+
+​    \nThen answer the following questions with [yes/no]: 
+
+​    \n1. Does the report include source code? If no, terminate early.
+
+​    \n2. Does the given source code conform to his intention? If no, terminate early.
+
+​    \n3. Is the issue an actually bug? If no, it is not a bug.
+
+​    \n4. Caused by the conflict between user expectation and compiler optimization assumption? If no, it is a programming error.
+
+​    \n5. Does the bug have security implications in the context? If no, it is a compiler bug. If yes, it is a CISB.
+
+​    \nAfter answering the above questions, state whether this bug report reflects a CISB.
+
+​    \nFinal conclusion: [CISB / Not a CISB / Inconclusive due to early termination]
+
+​    """
+
 ## 2.0 Version
+
 2.0 版本起加入了多角色设置，将先前的统一大 prompt 的任务分割成不同角色的 agent 指派，避免由于 prompt 信息过载导致输出质量降低。  
 在 2.0 版本中，设置的角色为 Digestor、Reasoner 和 Evaluator。分别负责：  
 1. 原始报告信息提取。
