@@ -9,6 +9,7 @@ class Agent:
         prompt (str): The prompt to use for the chat.
         API_KEY (str): The API key to use for the chat.
         URL (str): The URL to use for the chat.
+        platform (str): The platform to use for the chat, e.g., 'bugzilla' or 'kernel'.
 
     Member functions:
         chat(input) -> response: Chat with the model using the input.
@@ -20,6 +21,7 @@ class Agent:
         self.prompt = None
         self.API_KEY = None
         self.URL = None
+        self.platform = None
 
     def chat(self, input):
         pass
