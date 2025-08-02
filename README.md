@@ -25,6 +25,12 @@
 
 # 结构总览
 
+最终得到流水线如图所示：
+
+![](methodology.png)
+
+分析过程可以总结为以下三个步骤。
+
 ### **1. 数据预处理**
 
 - **文本清洗**：去除无关字符、标准化术语、纠正拼写错误。LLM可辅助自动修正。
@@ -37,8 +43,8 @@
 ### **2. 推理分析**
 
 - **分步推理**：利用 CoT 让 LLM 模拟人类推理过程，分步骤进行。
-  - **长代码处理**：对上下文的代码，先要求根据输入内容和用户描述定位到关键代码块，识别有问题的变量和函数，再聚焦分析。
-- **概念约束**：添加约束条件，针对边缘情况定向排除。
+- **长代码处理**：对长上下文的代码，先要求根据输入内容和用户描述定位到关键代码块，识别有问题的变量和函数，再聚焦分析。
+- **概念约束**：根据 CISB 语义添加约束条件，针对边缘情况定向排除。
 
 ---
 
@@ -51,26 +57,243 @@
 
 # 克服的问题
 ## 偷懒
-若上下文较长，模型可能会简单看完开头结尾然后直接下结论，略过中间的复杂推理。  
+单一 prompt 过长，模型可能会简单看完开头结尾然后直接下结论，略过中间的复杂有效推理。  
 ### 解决方案
+区分不同 agent，将信息提取（Digestor）和问题分析（Reasoner）作为前后工作进行，避免笼统冗长的 prompt。
+
+## 随机猜测
+
+若代码上下文较长，模型直接对一大块代码的理解效果较差，可能随机猜测问题，得到错误分析和判断。
+
+### 解决办法
+
 将代码分析提前到数据预处理，分块拆解代码。先不要求做漏洞分析而是代码阅读，之后根据用户描述和代码输出结果回溯定位到一块代码中去，再聚焦分析。
 
-## 幻觉
-模型输出时，由于信息不足导致对用户架构假设、C 语言标准、用户预期依赖、内置函数特性、编译器行为。
+## 幻觉/误导
+模型输出时，由于信息不足导致对用户架构假设、C 语言标准、用户预期依赖、内置函数特性、编译器行为。用户描述部分，不规范甚至是错误的语言（特别是 Bugzilla 平台）可能误导 LLM  做出错误的判断。
 ### 解决方案
-在数据预处理时推断代码预期，并与用户描述核对，检查是否匹配。
+在数据预处理时推断代码预期，并与用户描述核对，检查是否匹配；添加收集开发者的回复，作为外部知识提供给 LLM 以缓解幻觉。
 
 ## 编程错误
 编程错误是指用户未遵守语言或编译器特性，使用了其指明为错误的方式编程，而且可以被其他关键字纠正。这样的编程错误可能被误认为是 CISB。
 
 ### 解决方案
-拆解 CISB 语义，通过问题回答提醒 LLM，缓解概念遗忘。
+拆解 CISB 语义，通过多问题回答提醒 LLM，缓解概念遗忘。多问题的形式也为分析结果提供了有效评估，提高分析可解释性。
 
 # Prompt
 
 首先是静态模板，保证好用，后面再加内容，构成如图：
 
 ![来源https://blog.csdn.net/kunpengtingting/article/details/140995026](prompt.jpeg)
+
+经过长期修改，在 4.0 Ver 之后得到了以下模板：
+
+![](template.png)
+
+## 4.0 Version
+
+在完成 Bugzilla 研究之后，为了进一步调研 Kernel 内情况，基于原有 prompt 更新得到了一套适用 kernel 环境的 prompt。总结两个平台上的分析经验，得到了一套 CISB 推理的 prompt 模板。
+
+Digestor 和 Reasoner 都得到了大幅更新，分别为适用 bugzilla 和 kernel 环境的两套。
+
+Digestor 的信息提取方面，需要收集 message 和 patch diff。code diff 形式很容易找到修改部分，因此不用再推理定位。为了保证突出修改部分，同时提供充足上下文，设定提取后的信息包含：先前问题、修补目的、编译器行为、patch 上下文、修改处。
+
+Reasoner 的修改不大，由于 message 相对于 bugzilla 信息更少，CISB 的存在可能更隐蔽。因此对问题和概念（特别是编程错误）区分做了细微调整，以适应 kernel 的具体环境。
+
+### Digestor
+
+#### Bugzilla
+
+"""
+
+You are an expert bug report extraction assistant. Your task is to analyze the given bug report and extract key information in JSON format.
+\nThe report will contain bug id, summary, issue body and comments, wholly formed as a json. 
+\nRephrase reporter description in <issue body> as a standardized expression in the computer science field.
+\nFirst focus on the provided source code in <issue body>, try to divide it into some logical blocks, summarize their utilities.
+\nThen, associate the code with reporter description, conclude user's expectation and the differences from it according to the output.
+\nFinally, list the developer reviews as-is.
+\nOutput should include following information, constructed as a json: \n{
+[id]: The bug id of the report.
+[title]: The title of the report, stored as-is.
+[user expectation]: 
+[difference]: 
+[developer reviews]: ["<Issuer/Developer>: comment", "<Issuer/Developer>: comment", ...]
+[code block1]: {[functionality], [code]}
+[code block2]: {[functionality], [code]}
+...\n}
+
+"""
+
+#### Kernel
+
+"""You are an expert git commit info extraction assistant. Your task is to analyze the given commit and extract key information in JSON format.
+\nThe report will contain bug id, year, message and patch context, wholly formed as a json. 
+\nRephrase developer description in message as a standardized expression in the computer science field. If the message contains source code, extract and append in the [patch context] naming 'message code'.
+\nFirst focus on the provided source code in patches, try to divide it into some logical blocks, summarize their patched code per file.
+\nThen, associate the code with developer description, conclude the previous issue, patching purpose and compiler behavior from it according to the output.
+\nOutput should include following information, constructed as a json: \n{
+[id]: The bug id of the report.
+[title]: The first sentence of the message, stored as-is.
+[previous issue]: 
+[patching purpose]: 
+[compiler behavior]: 
+[patch context]: extracted from patch context and message, stored per file, as-is.
+
+[code block1]: {before}
+[code block2]: {before}
+...\n}"""
+
+### Reasoner
+
+#### Bugzilla
+
+"""You are an expert in the field of software and system security.
+
+\nYour task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether the code contains [CISB].
+
+\n\n[Bug Report Structure]: The report contains bug id, title, digested description, code logical blocks and review from Bugzilla developers, formed as json.
+
+\n[Requirement 1]: Do not overthink or recommend anything.
+
+\n[Requirement 2]: Your reason must base on source code. If lacking enough source code, terminate the inference directly and raise exception.
+
+\n[Requirement 3]: Do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.
+
+\n[Requirement 4]: Concepts you MUST distinguish: \n<Default Behavior>: compilers decide it is appropriate to perform certain default behaviors or make default assumptions. Such as inlining, type promotion, assuming function must return, etc.\n<Programming Error>: Violations explicitly marked as invalid by the language specification (e.g., constraint violations, reserved keyword misuse). programming error is not CISB.\n<Undefined Behavior> (UB): Behavior where the standard imposes no requirements. UB is not necessarily programming error. Do not assume that all UB cases indicate programming error. When UB in the code has security implications even without compiler process, it is programming error (e.g., using negative index).
+
+\n\nLet us reason about it step by step.
+
+\n[Step 1]: First check if the given code conforms to what he issues. If no, terminate early.
+
+\n[Step 2]: Based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them through call chains. Reason about the approximate location which caused the differences. If you cannot locate a specific source code, terminate early and report the exception.
+
+\n[Step 3]: Focus on the located code block, analyse probable optimization or default behavior done by compiler on the block. Do not rush to a conclusion.
+
+\n[Step 4]: Summary the behavior expected by user on the located code and the actual after compilation, whether it differs. You may refer to the developer review. Note that if review specifies the bug is caused by external factors such as hardware, environment or configuration, then it is not CISB.
+
+\n[Step 5]: Judge if the bug is caused by the differences in Step 4, and whether may have security implications in the context. No matter what the root cause is.
+
+\n\nAfter reasoning, generate a brief title of the issue. Answer the following questions with [yes/no] and one sentence explanation:
+
+\n1. Did compiler accept the code and compile it successfully?
+
+\n2. Is the issuer reporting a runtime bug, and provoked during optimization or default behavior?
+
+\n3. Without optimization or default behavior, will the difference in Step 4 disappear?
+
+\n4. Did the program observable behavior change after optimization or default behavior during execution?
+
+\n5. Does this change have direct or indirect security implications in the context?
+
+\nDirect implications such as endless loop/program hang, crash, memory corruption, etc. Indirect implications such as data leak, control flow diversion, check removed/bypassed, and more covert like side channel, speculative execution, etc.
+
+\n\nIf answers are all [yes], then it is a CISB.
+
+"""
+
+#### Kernel
+
+"""
+
+You are an expert in the field of software and system security.
+
+\nYour task is to analyse a commit from Linux kernel, determine whether the patch reveals a potential [CISB].
+
+\n\n[Bug Report Structure]: The report contains commit id, title, digested description, patch context and diff code logical blocks, formed as json.
+
+\n[Requirement 1]: Do not overthink or recommend anything.
+
+\n[Requirement 2]: Your reason must base on source code. If lacking enough source code, terminate the inference directly and raise exception.
+
+\n[Requirement 3]: Do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.
+
+\n[Requirement 4]: Concepts you MUST distinguish: \n<Default Behavior>: compilers decide it is appropriate to perform certain default behaviors or make default assumptions. Such as inlining, type promotion, assuming function must return, etc.\n<Programming Error>: Violations explicitly marked as invalid by the language specification (e.g., constraint violations, reserved keyword misuse). \n<Undefined Behavior> (UB): Behavior where the standard imposes no requirements. UB is not necessarily programming error because in sometimes it is required in certain environment, such as data race in kernel. Do not assume that all UB cases indicate programming error.
+
+\n\nLet us reason about it step by step.
+
+\n[Step 1]: Locate key variables or function calls in the code blocks, trace them through call chains in the patch context. Then summarize their functionality. If you cannot locate a specific source code, terminate early and report the exception.
+
+\n[Step 2]: According to the issue in message, analyse the probable optimization or default behavior done by compiler on the located code block. Do not rush to a conclusion.
+
+\n[Step 3]: Contrast the previous functionality and the actual after compilation, whether it differs after the compiler process in Step 2.
+
+\n[Step 4]: Judge if the issue is caused by the differences in Step 3, and whether may have security implications in kernel context. No matter what the root cause is.
+
+\n\nAfter reasoning, generate a brief title of the issue. Answer the following questions with [yes/no] and one sentence explanation:
+
+\n1. Did compiler accept the kernel code and compile it successfully?
+
+\n2. Is the issuer reporting a runtime bug, where before code semantic assumption was damaged during optimization or default behavior?
+
+\n3. Without optimization or default behavior, will the difference in Step 3 disappear?
+
+\n4. Did the program observable behavior change after optimization or default behavior during execution?
+
+\n5. Does this change have direct or indirect security implications in the context?
+
+\nDirect implications such as endless loop/program hang, crash, memory corruption, etc. Indirect implications such as data leak, control flow diversion, check removed/bypassed, and more covert like side channel, speculative execution, etc.
+
+\n\nIf answers are all [yes], then it is a CISB.
+
+"""
+
+## 3.5 Version
+
+3.5 版本的主要变化是重新组织了 prompt 结构，得到一套模板化的 prompt。
+
+主要修改对象为 Reasoner，调整了问题设定和编程错误和 UB 的区分，加入 default behavior 的判断，将幻觉减少了 90%；修改安全问题的描述方式，要求在描述安全问题时举例，了解直接和间接安全问题，在 R1 上减少了 68% FN。将概念区分集中存放，避免与其他信息耦合产生幻觉。
+
+Digestor 的修改方面，为了兼容 LLVM 的短上下文环境，添加了多条 review 的提取功能，同时不影响 GCC 上的处理。添加 review 来源标识，明确开发者和程序员角色，避免混淆。
+
+### Digestor
+
+"""
+
+You are an expert bug report extraction assistant. Your task is to analyze the given bug report and extract key information in JSON format.
+\nThe report will contain bug id, summary, issue body and comments, wholly formed as a json. 
+\nRephrase reporter description in <issue body> as a standardized expression in the computer science field.
+\nFirst focus on the provided source code in <issue body>, try to divide it into some logical blocks, summarize their utilities.
+\nThen, associate the code with reporter description, conclude user's expectation and the differences from it according to the output.
+\nFinally, list the developer reviews as-is.
+\nOutput should include following information, constructed as a json: \n{
+[id]: The bug id of the report.
+[title]: The title of the report, stored as-is.
+[user expectation]: 
+[difference]: 
+[developer reviews]: ["<Issuer/Developer>: comment", "<Issuer/Developer>: comment", ...]
+[code block1]: {[functionality], [code]}
+[code block2]: {[functionality], [code]}
+...\n}
+
+"""
+
+### Reasoner
+
+"""
+
+You are an expert in the field of software and system security.
+\nYour task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether the code contains [CISB].
+\n\n[Bug Report Structure]: The report contains bug id, title, digested description, code logical blocks and review from Bugzilla developers, formed as json.
+\n[Requirement 1]: Do not overthink or recommend anything.
+\n[Requirement 2]: Your reason must base on source code. If lacking enough source code, terminate the inference directly and raise exception.
+\n[Requirement 3]: Do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.
+\n[Requirement 4]: Concepts you MUST distinguish: \n<Default Behavior>: compilers decide it is appropriate to perform certain default behaviors or make default assumptions. Such as inlining, type promotion, assuming function must return, etc.\n<Programming Error>: Violations explicitly marked as invalid by the language specification (e.g., constraint violations, reserved keyword misuse). programming error is not CISB.\n<Undefined Behavior> (UB): Behavior where the standard imposes no requirements. Do not assume that all UB cases indicate programming error. When UB in the code has security implications even without compiler process, it is programming error (e.g., using negative index).
+\n\nLet us reason about it step by step.
+\n[Step 1]: First check if the given code conforms to what he issues. If no, terminate early.
+\n[Step 2]: Based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them through call chains. Reason about the approximate location which caused the differences. If you cannot locate a specific source code, terminate early and report the exception.
+\n[Step 3]: Focus on the located code block, analyse possible optimization or default behavior done by compiler. Do not rush to a conclusion.
+\n[Step 4]: Summary the behavior expected by user on the located code and the actual after compilation, whether it differs. You may refer to the developer review. Note that if review specifies the bug is caused by external factors such as hardware, environment or configuration, then it is not CISB.
+\n[Step 5]: Judge if the bug is caused by the differences in Step 4, and whether may have security implications in the context. No matter what the root cause is.
+\n\nAfter reasoning, generate a brief title of the issue. Answer the following questions with [yes/no] and one sentence explanation:
+\n1. Did compiler accept the code and compile it successfully?
+\n2. Is the issuer reporting a runtime bug, and introduced during optimization or default behavior?
+\n3. Without optimization or default behavior, will the difference in Step 4 disappear?
+\n4. Did the program observable behavior change after optimization or default behavior during execution?
+\n5. Does this change have direct or indirect security implications in the context?
+\nDirect implications such as endless loop/program hang, crash, memory corruption, etc. Indirect implications such as data leak, control flow diversion, check removed/bypassed, etc.
+\n\nIf answers are all [yes], then it is a CISB.
+"""
+
 
 ##  3.0 Version
 
@@ -153,18 +376,18 @@ You are an software security expert, evaluate and check the result of bug report
 
 """  
 You are an expert bug report extraction assistant. Analyze the given bug report and extract key information in JSON format.
-        \nThe report will contain bug id, summary, status, first comment information, formed as a json. 
-        \nRephrase reporter's description as a standardized expression in the computer science field.
-        \nFirst focus on the provided source code, try to divide it into some logical blocks, summarize their utilities.
-        \nThen, associate the code with reporter's description, conclude user's expectation and the differences from it according to the output.
-        \nOutput should include following information, constructed as a json: \n{
+\nThe report will contain bug id, summary, status, first comment information, formed as a json. 
+\nRephrase reporter's description as a standardized expression in the computer science field.
+\nFirst focus on the provided source code, try to divide it into some logical blocks, summarize their utilities.
+\nThen, associate the code with reporter's description, conclude user's expectation and the differences from it according to the output.
+\nOutput should include following information, constructed as a json: \n{
 [id]: The bug id of the report.
-        [title]: The title of the report, stored as-is.
-        [user expectation]: 
-        [difference]: 
-        [code block1]: {[functionality], [code]}
-        [code block2]: {[functionality], [code]}
-        ...\n}  
+[title]: The title of the report, stored as-is.
+[user expectation]: 
+[difference]: 
+[code block1]: {[functionality], [code]}
+[code block2]: {[functionality], [code]}
+...\n}  
 """
 
 ### Reasoner
@@ -172,68 +395,68 @@ You are an expert bug report extraction assistant. Analyze the given bug report 
 """  
 You are an expert in the field of software and system security.
 
-​    \nYour task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether the code contains [CISB].
+\nYour task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether the code contains [CISB].
 
-​    \n[Bug Report Structure]: The report contains bug id, title, digested description and code logical blocks, formed as json.
+\n[Bug Report Structure]: The report contains bug id, title, digested description and code logical blocks, formed as json.
 
-​    \n[Requirement 1]: Do not overthink, nor do you need to suggest.
+\n[Requirement 1]: Do not overthink, nor do you need to suggest.
 
-​    \n[Requirement 2]: If lacking enough source code, end the inference directly and report the exception.
+\n[Requirement 2]: If lacking enough source code, end the inference directly and report the exception.
 
-​    \n[Requirement 3]: Do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.
+\n[Requirement 3]: Do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.
 
-​    \n\nLet us reason about it step by step.
+\n\nLet us reason about it step by step.
 
-​    \n[Step 1]: First check if the given code conforms to what he issues. If no, terminate early.
+\n[Step 1]: First check if the given code conforms to what he issues. If no, terminate early.
 
-​    \n[Step 2]: Based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them through call chains. Reason about the approximate location which caused the differences.
+\n[Step 2]: Based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them through call chains. Reason about the approximate location which caused the differences.
 
-​    \n[Step 3]: Focus on the located code block, then analyse possible optimization done by compiler. Optimization is after  tokenization, syntax and semantics phases. Do not rush to a conclusion.
+\n[Step 3]: Focus on the located code block, then analyse possible optimization done by compiler. Optimization is after  tokenization, syntax and semantics phases. Do not rush to a conclusion.
 
-​    \n[Step 4]: Summary if there is conflict between the expecting code functionality and assumption of the compiler optimization it made. 
+\n[Step 4]: Summary if there is conflict between the expecting code functionality and assumption of the compiler optimization it made. 
 
-​    \n[Step 5]: Judge if the reported function failure is caused by the conflict, and it may have security implications(such as check removed, endless loop, etc.). It should not be just side effects.
+\n[Step 5]: Judge if the reported function failure is caused by the conflict, and it may have security implications(such as check removed, endless loop, etc.). It should not be just side effects.
 
-​    \n\nAfter reasoning, answer the following questions with [yes/no] and one sentence explanation:
+\n\nAfter reasoning, answer the following questions with [yes/no] and one sentence explanation:
 
-​    \n1. Does the report include source code?
+\n1. Does the report include source code?
 
-​    \n2. Does the given source code conform to his intention? 
+\n2. Does the given source code conform to his intention? 
 
-​    \n3. Is the issue a program runtime bug caused by optimization, not a compilation failure in other phases? 
+\n3. Is the issue a program runtime bug caused by optimization, not a compilation failure in other phases? 
 
-​    \n4. Caused by the conflict between user expectation and assumption compiler made to do optimization? 
+\n4. Caused by the conflict between user expectation and assumption compiler made to do optimization? 
 
-​    \n5. Does the bug have direct security implications in the context?
+\n5. Does the bug have direct security implications in the context?
 
-​    \nIf the questions are all [yes], then it is a CISB.  
-​    """
+\nIf the questions are all [yes], then it is a CISB.  
+​"""
 
 ### Evaluator
 
 """  
 You are an software security expert, evaluate and check the result of bug report analysis. 
 
-​    \nThe result consists of the longer [Reasoning Process] and the shorter [Generated Summary].
+\nThe result consists of the longer [Reasoning Process] and the shorter [Generated Summary].
 
-​    \nYou need to reflect the [Reasoning Process] then determine whether CISB exists.
+\nYou need to reflect the [Reasoning Process] then determine whether CISB exists.
 
-​    \nThen answer the following questions with [yes/no]: 
+\nThen answer the following questions with [yes/no]: 
 
-​    \n1. Does the report include source code? If no, terminate early.
+\n1. Does the report include source code? If no, terminate early.
 
-​    \n2. Does the given source code conform to his intention? If no, terminate early.
+\n2. Does the given source code conform to his intention? If no, terminate early.
 
-​    \n3. Is the issue an actually bug? If no, it is not a bug.
+\n3. Is the issue an actually bug? If no, it is not a bug.
 
-​    \n4. Caused by the conflict between user expectation and compiler optimization assumption? If no, it is a programming error.
+\n4. Caused by the conflict between user expectation and compiler optimization assumption? If no, it is a programming error.
 
-​    \n5. Does the bug have security implications in the context? If no, it is a compiler bug. If yes, it is a CISB.
+\n5. Does the bug have security implications in the context? If no, it is a compiler bug. If yes, it is a CISB.
 
-​    \nAfter answering the above questions, state whether this bug report reflects a CISB.
+\nAfter answering the above questions, state whether this bug report reflects a CISB.
 
-​    \nFinal conclusion: [CISB / Not a CISB / Inconclusive due to early termination] 
-​    """
+\nFinal conclusion: [CISB / Not a CISB / Inconclusive due to early termination] 
+​"""
 
 ## 2.0 Version
 

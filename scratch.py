@@ -3,7 +3,7 @@ from bs4 import BeautifulSoup
 import json
 import time
 
-COUNT_URL = 'https://gcc.gnu.org/bugzilla/buglist.cgi?bug_status=UNCONFIRMED&bug_status=NEW&bug_status=ASSIGNED&bug_status=SUSPENDED&bug_status=WAITING&bug_status=REOPENED&bug_status=RESOLVED&bug_status=VERIFIED&bug_status=CLOSED&cf_known_to_fail_type=allwords&cf_known_to_work_type=allwords&chfield=%5BBug%20creation%5D&chfieldfrom=2022-01-01&chfieldto=Now&component=analyzer&component=boehm-gc&component=c&component=c%2B%2B&component=classpath&component=cp-tools&component=crypto&component=debug&component=demangler&component=driver&component=fastjar&component=gcov-profile&component=inetlib&component=inline-asm&component=ipa&component=jit&component=libbacktrace&component=libcc1&component=libf2c&component=libgcc&component=libgdiagnostics&component=libobjc&component=libquadmath&component=libstdc%2B%2B&component=lto&component=middle-end&component=modula2&component=preprocessor&component=regression&component=rtl-optimization&component=sanitizer&component=sarif-replay&component=target&component=testsuite&component=translation&component=tree-optimization&component=web&component=xml&limit=0&order=bug_id&query_format=advanced&resolution=INVALID&limit=0'
+COUNT_URL = 'https://gcc.gnu.org/bugzilla/buglist.cgi?bug_status=RESOLVED&bug_status=CLOSED&cf_known_to_fail_type=allwords&cf_known_to_work_type=allwords&component=target&limit=0&longdesc=optimi%20kernel%20-fno%20builtin%20-Og%20-O0%20-O1%20-O2%20-O3%20-Os%20-Ofast%20unalign%20misalign%20redefine%20eliminat%20dead%20initiali%20inline%20replace%20promotion%20secur&longdesc_type=anywordssubstr&order=bug_id&product=gcc&query_format=advanced&resolution=INVALID'
 BASE_URL = "https://gcc.gnu.org/bugzilla/show_bug.cgi?id="
 
 class ReportScraper:
@@ -44,15 +44,18 @@ class ReportScraper:
         if response.status_code == 200:
             soup = BeautifulSoup(response.content, "html.parser")
             summary = soup.find('span', id= 'short_desc_nonedit_display').text.strip()
-            status = soup.find("span", id='static_bug_status').text.strip()
+            # status = soup.find("span", id='static_bug_status').text.strip()
             first_comment = soup.find('pre', class_='bz_comment_text').text.strip()
-            # attachments = 
+            last_modified = soup.find('span', id='information').text.strip()
+            
 
             return {
                 'id': bug_id,
                 'summary': summary,
-                'status': status,
-                'first_comment': first_comment
+                'last_modified': last_modified,
+            #    'status': status,
+                'first_comment': first_comment,
+                'developer_review': ''
             }
         else:
             print(f'Failed to fetch bug report for ID {bug_id}')
@@ -110,3 +113,4 @@ if __name__ == "__main__":
     # store_bug_report_as_json()
     helper = ReportScraper()
     helper.update_bug_reports()
+    # helper.store_bug_report_as_json()
