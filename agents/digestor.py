@@ -80,6 +80,7 @@ class Digestor(Agent):
         response = self.chat(report)
         with open(f"{bug_id[:10] if self.platform == 'kernel' else bug_id}_digest.json", "w", encoding="utf-8") as f:
             f.write(response.choices[0].message.content)
+        print(f"Digested the input and generate results: {bug_id[:10] if self.platform == 'kernel' else bug_id}_digest.json")
         return
         #Helper().generate_digest(report, response)
 

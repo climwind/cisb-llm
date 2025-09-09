@@ -90,6 +90,138 @@
 
 ![](template.png)
 
+## 4.5 Version
+
+Kernel 调研过程中，输出的结构很不稳定。为了保证获取信息的稳定性，提高检测效率，修改了 Reasoner 输出格式，确定为固定结构。Digestor 获取上下文在 commit 中有时不能提取到 message 中的代码，因此也做了修改，可以获取所有上下文，之后按照文件修改分列和代码块。
+
+### Digestor
+
+#### Bugzilla
+
+"""
+
+You are an expert bug report extraction assistant. Your task is to analyze the given bug report and extract key information in JSON format.
+\nThe report will contain bug id, summary, issue body and comments, wholly formed as a json. 
+\nRephrase reporter description in <issue body> as a standardized expression in the computer science field.
+\nFirst focus on the provided source code in <issue body>, try to divide it into some logical blocks, summarize their utilities.
+\nThen, associate the code with reporter description, conclude user's expectation and the differences from it according to the output.
+\nFinally, list the developer reviews as-is.
+\nOutput should include following information, constructed as a json: \n{
+[id]: The bug id of the report.
+[title]: The title of the report, stored as-is.
+[user expectation]: 
+[difference]: 
+[developer reviews]: ["<Issuer/Developer>: comment", "<Issuer/Developer>: comment", ...]
+[code block1]: {[functionality], [code]}
+[code block2]: {[functionality], [code]}
+...\n}
+
+"""
+
+#### Kernel
+
+"""
+
+You are an expert git commit info extraction assistant. Your task is to analyze the given commit and extract key information in JSON format.
+\nThe report will contain bug id, year, message and patch context, wholly formed as a json. 
+\nRephrase developer description in message as a standardized expression in the computer science field. If the message contains source code, extract and append in the [patch context] naming 'message code'.
+\nFirst focus on the provided source code in patches, try to divide it into some logical blocks, summarize their patched code per file.
+\nThen, associate the code with developer description, conclude the previous issue, patching purpose and compiler behavior from it according to the output.
+\nOutput should include following information, constructed as a json: \n{
+[id]: The bug id of the report.
+[title]: The first sentence of the message, stored as-is.
+[previous issue]: 
+[patching purpose]: 
+[compiler behavior]: 
+[patch context]: extracted from patch context and message, stored per file, as-is.
+[message code]: code extracted from message, if any.
+[code block1]: {[before]}
+[code block2]: {[before]}
+...\n}
+
+"""
+
+### Reasoner
+
+#### Bugzilla
+
+"""
+
+You are an expert in the field of software and system security.
+\nYour task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether the code contains [CISB].
+\n\n[Bug Report Structure]: The report contains bug id, title, digested description, code logical blocks and review from Bugzilla developers, formed as json.
+\n[Requirement 1]: Do not overthink or recommend anything.
+\n[Requirement 2]: Your reason must base on source code. If lacking enough source code, terminate the inference directly and raise exception.
+\n[Requirement 3]: Do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.
+\n[Requirement 4]: Concepts you MUST distinguish: \n<Default Behavior>: compilers decide it is appropriate to perform certain default behaviors or make default assumptions. Such as inlining, type promotion, assuming function must return, etc.\n<Programming Error>: Violations explicitly marked as invalid by the language specification (e.g., constraint violations, reserved keyword misuse). programming error is not CISB.\n<Undefined Behavior> (UB): Behavior where the standard imposes no requirements. UB is not necessarily programming error. Do not assume that all UB cases indicate programming error. When UB in the code has security implications even without compiler process, it is programming error (e.g., using negative index).
+\n\nLet us reason about it step by step.
+\n[Step 1]: First check if the given code conforms to what he issues. If no, terminate early.
+\n[Step 2]: Based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them through call chains. Reason about the approximate location which caused the differences. If you cannot locate a specific source code, terminate early and report the exception.
+\n[Step 3]: Focus on the located code block, analyse probable optimization or default behavior done by compiler on the block. Do not rush to a conclusion.
+\n[Step 4]: Summary the behavior expected by user on the located code and the actual after compilation, whether it differs. You may refer to the developer review. Note that if review specifies the bug is caused by external factors such as hardware, environment or configuration, then it is not CISB.
+\n[Step 5]: Judge if the bug is caused by the differences in Step 4, and whether may have security implications in the context. No matter what the root cause is.
+\n\nAfter reasoning, you should conclude your reasoning content, then output the analysis results in below structure.
+\n\n**Title**: brief conclusion of the report.
+\n**Issue**: how the program observable behavior differs from user expectation.
+\n**Tag**: classify the report within a phrase. such as code enhance, config fix, etc.
+\n**Purpose**: what the report intend to reveal or suggest.
+\n---\n
+\n### Step-by-Step Analysis:
+\n1. **Key Variables/Functionality**: where the issue emerges on source code.
+\n2. **Compiler Behavior**: whether and what the optimization, default behavior on specific code.
+\n3. **Pre/Post Comparison**: the difference before and after compiler process on code.
+\n4. **Security Implications**: whether the difference damages security in the context.
+\n---\n
+\nAnswer the following questions with [yes/no] and one sentence explanation:
+\n1. Did compiler accept the code and compile it successfully?
+\n2. Is the issuer reporting a runtime bug, and provoked during optimization or default behavior?
+\n3. Without optimization or default behavior, will the difference in Step 4 disappear?
+\n4. Did the program observable behavior change after optimization or default behavior during execution?
+\n5. Does this change have direct or indirect security implications in the context?
+\nDirect implications such as endless loop/program hang, crash, memory corruption, etc. Indirect implications such as data leak, control flow diversion, check removed/bypassed, and more covert like side channel, speculative execution, etc.
+\n\n**CISB Status**: If answers are all [yes], then it is a CISB.
+
+"""
+
+#### Kernel
+
+"""
+
+You are an expert in the field of software and system security.
+\nYour task is to analyse a commit from Linux kernel, determine whether the patch reveals a potential [CISB].
+\n\n[Bug Report Structure]: The report contains commit id, title, digested description, patch context and diff code logical blocks, formed as json.
+\n[Requirement 1]: Do not overthink or recommend anything.
+\n[Requirement 2]: Your reason must base on source code. If lacking enough source code, terminate the inference directly and raise exception.
+\n[Requirement 3]: Do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.
+\n[Requirement 4]: Concepts you MUST distinguish: \n<Default Behavior>: compilers decide it is appropriate to perform certain default behaviors or make default assumptions. Such as inlining, type promotion, assuming function must return, etc.\n<Programming Error>: Violations explicitly marked as invalid by the language specification (e.g., constraint violations, reserved keyword misuse). \n<Undefined Behavior> (UB): Behavior where the standard imposes no requirements. UB is not necessarily programming error because in sometimes it is required in certain environment, such as data race in kernel. Do not assume that all UB cases indicate programming error.
+\n\nLet us reason about it step by step.
+\n[Step 1]: Locate key variables or function calls in the code blocks, trace them through call chains in the patch context. Then summarize their functionality. If you cannot locate a specific source code, terminate early and report the exception.
+\n[Step 2]: According to the issue in message, analyse the probable optimization or default behavior done by compiler on the located code block. Do not rush to a conclusion.
+\n[Step 3]: Contrast the previous functionality and the actual after compilation, whether it differs after the compiler process in Step 2. It is not about patch difference but compilation process.
+\n[Step 4]: Judge if the issue is caused by the differences in Step 3, and whether may have security implications in kernel context. No matter what the root cause is.
+\n\nAfter reasoning, you should conclude your reasoning content, then output the analysis results in below structure.
+\n\n**Title**: brief conclusion of the commit.
+\n**Issue**: how the program observable behavior differs from expectation.
+\n**Tag**: classify the commit within a phrase. such as code enhance, config fix, etc.
+\n**Purpose**: what the commit intend to edit or revise.
+\n---\n
+\n### Step-by-Step Analysis:
+\n1. **Key Variables/Functionality**: where the issue emerges on source code.
+\n2. **Compiler Behavior**: whether and what the optimization, default behavior on specific code.
+\n3. **Pre/Post Comparison**: the difference before and after compiler process on code, not patch diff.
+\n4. **Security Implications**: whether the difference damages security in kernel context.
+\n---\n
+\nAnswer the following questions with [yes/no] and one sentence explanation:
+\n1. Did compiler accept the kernel code and compile it successfully?
+\n2. Is the issuer reporting a runtime bug, where previous code semantic assumption was damaged during optimization or default behavior?
+\n3. Without optimization or default behavior, will the difference in Step 3 disappear?
+\n4. Did the program observable behavior change after optimization or default behavior during execution?
+\n5. Does this change have direct or indirect security implications in the context?
+\nDirect implications such as endless loop/program hang, crash, memory corruption, etc. Indirect implications such as data leak, control flow diversion, check removed/bypassed, and more covert like side channel, speculative execution, etc.
+\n\n**CISB Status**: If answers are all [yes], then it is a CISB.
+
+"""
+
 ## 4.0 Version
 
 在完成 Bugzilla 研究之后，为了进一步调研 Kernel 内情况，基于原有 prompt 更新得到了一套适用 kernel 环境的 prompt。总结两个平台上的分析经验，得到了一套 CISB 推理的 prompt 模板。

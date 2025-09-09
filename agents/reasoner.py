@@ -58,14 +58,26 @@ class Reasoner(Agent):
             \n[Step 3]: Focus on the located code block, analyse probable optimization or default behavior done by compiler on the block. Do not rush to a conclusion.
             \n[Step 4]: Summary the behavior expected by user on the located code and the actual after compilation, whether it differs. You may refer to the developer review. Note that if review specifies the bug is caused by external factors such as hardware, environment or configuration, then it is not CISB.
             \n[Step 5]: Judge if the bug is caused by the differences in Step 4, and whether may have security implications in the context. No matter what the root cause is.
-            \n\nAfter reasoning, generate a brief title of the issue. Answer the following questions with [yes/no] and one sentence explanation:
+            \n\nAfter reasoning, you should conclude your reasoning content, then output the analysis results in below structure.
+            \n\n**Title**: brief conclusion of the report.
+            \n**Issue**: how the program observable behavior differs from user expectation.
+            \n**Tag**: classify the report within a phrase. such as code enhance, config fix, etc.
+            \n**Purpose**: what the report intend to reveal or suggest.
+            \n---\n
+            ### Step-by-Step Analysis:
+            \n1. **Key Variables/Functionality**: where the issue emerges on source code.
+            \n2. **Compiler Behavior**: whether and what the optimization, default behavior on specific code.
+            \n3. **Pre/Post Comparison**: the difference before and after compiler process on code.
+            \n4. **Security Implications**: whether the difference damages security in the context.
+            \n---\n
+            \nAnswer the following questions with [yes/no] and one sentence explanation:
             \n1. Did compiler accept the code and compile it successfully?
             \n2. Is the issuer reporting a runtime bug, and provoked during optimization or default behavior?
             \n3. Without optimization or default behavior, will the difference in Step 4 disappear?
             \n4. Did the program observable behavior change after optimization or default behavior during execution?
             \n5. Does this change have direct or indirect security implications in the context?
             \nDirect implications such as endless loop/program hang, crash, memory corruption, etc. Indirect implications such as data leak, control flow diversion, check removed/bypassed, and more covert like side channel, speculative execution, etc.
-            \n\nIf answers are all [yes], then it is a CISB.
+            \n\n**CISB Status**: If answers are all [yes], then it is a CISB.
             """
         elif self.platform == 'kernel':
             self.prompt = """
@@ -79,16 +91,28 @@ class Reasoner(Agent):
             \n\nLet us reason about it step by step.
             \n[Step 1]: Locate key variables or function calls in the code blocks, trace them through call chains in the patch context. Then summarize their functionality. If you cannot locate a specific source code, terminate early and report the exception.
             \n[Step 2]: According to the issue in message, analyse the probable optimization or default behavior done by compiler on the located code block. Do not rush to a conclusion.
-            \n[Step 3]: Contrast the previous functionality and the actual after compilation, whether it differs after the compiler process in Step 2.
+            \n[Step 3]: Contrast the previous functionality and the actual after compilation, whether it differs after the compiler process in Step 2. It is not about patch difference but compilation process.
             \n[Step 4]: Judge if the issue is caused by the differences in Step 3, and whether may have security implications in kernel context. No matter what the root cause is.
-            \n\nAfter reasoning, generate a brief title of the issue. Answer the following questions with [yes/no] and one sentence explanation:
+            \n\nAfter reasoning, you should conclude your reasoning content, then output the analysis results in below structure.
+            \n\n**Title**: brief conclusion of the commit.
+            \n**Issue**: how the program observable behavior differs from expectation.
+            \n**Tag**: classify the commit within a phrase. such as code enhance, config fix, etc.
+            \n**Purpose**: what the commit intend to edit or revise.
+            \n---\n
+            ### Step-by-Step Analysis:
+            \n1. **Key Variables/Functionality**: where the issue emerges on source code.
+            \n2. **Compiler Behavior**: whether and what the optimization, default behavior on specific code.
+            \n3. **Pre/Post Comparison**: the difference before and after compiler process on code, not patch diff.
+            \n4. **Security Implications**: whether the difference damages security in kernel context.
+            \n---\n
+            \nAnswer the following questions with [yes/no] and one sentence explanation:
             \n1. Did compiler accept the kernel code and compile it successfully?
             \n2. Is the issuer reporting a runtime bug, where previous code semantic assumption was damaged during optimization or default behavior?
             \n3. Without optimization or default behavior, will the difference in Step 3 disappear?
             \n4. Did the program observable behavior change after optimization or default behavior during execution?
             \n5. Does this change have direct or indirect security implications in the context?
             \nDirect implications such as endless loop/program hang, crash, memory corruption, etc. Indirect implications such as data leak, control flow diversion, check removed/bypassed, and more covert like side channel, speculative execution, etc.
-            \n\nIf answers are all [yes], then it is a CISB.
+            \n\n**CISB Status**: If answers are all [yes], then it is a CISB.
             """
         # for key in kwargs:
         #     for k in self.template[key]:
