@@ -10,7 +10,7 @@ SEARCH_QUERY = "is:issue is:closed repo:llvm/llvm-project label:invalid NOT \"er
 PER_PAGE = 100  # 每页最大 100 条
 OUTPUT_FILE = "llvm_issues_part1.json"
 IDS_FILE = "llvm_issue_ids.txt"
-
+KEYWORD_SEARCH = False  # 是否先进行关键词搜索过滤
 # GitHub 个人访问令牌（支持 fine-grained PAT）
 GITHUB_TOKEN = os.getenv("GITHUB_TOKEN")  # 或直接填入："github_pat_..."
 
@@ -119,7 +119,11 @@ def get_issue_details(issue_id):
 
 def main():
     """主函数，提取 Issues 并保存为 JSON"""
-    issue_ids = get_all_search_results()
+    if KEYWORD_SEARCH:
+        issue_ids = get_all_search_results()
+    else:
+        issue_ids = open(IDS_FILE, "r", encoding="utf-8").read().splitlines()
+        
     all_issues = {}
     for issue_id in issue_ids:
         issue_details = get_issue_details(issue_id)
