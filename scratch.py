@@ -45,7 +45,9 @@ class ReportScraper:
             soup = BeautifulSoup(response.content, "html.parser")
             summary = soup.find('span', id= 'short_desc_nonedit_display').text.strip()
             # status = soup.find("span", id='static_bug_status').text.strip()
-            first_comment = soup.find('pre', class_='bz_comment_text').text.strip()
+            comments = soup.find_all('pre', class_='bz_comment_text')
+            first_comment = comments[0].text.strip() if len(comments) > 0 else ''
+            developer_review = comments[1].text.strip() if len(comments) > 1 else ''
             last_modified = soup.find('span', id='information').text.strip()
             
 
@@ -55,7 +57,7 @@ class ReportScraper:
                 'last_modified': last_modified,
             #    'status': status,
                 'first_comment': first_comment,
-                'developer_review': ''
+                'developer_review': developer_review,
             }
         else:
             print(f'Failed to fetch bug report for ID {bug_id}')
