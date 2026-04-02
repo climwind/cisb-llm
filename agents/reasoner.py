@@ -2,17 +2,18 @@ from agent import Agent
 from openai import OpenAI
 from helper import Helper
 
+
 class Reasoner(Agent):
-    '''
+    """
     Constitution:
     1. Set up a role
     2. State the trouble
     3. Define the task
     4. Extra requirements
     5. CoT (optional)
-    '''
+    """
 
-    def __init__(self, model, prompt, API_KEY, URL, platform='bugzilla'):
+    def __init__(self, model, prompt, API_KEY, URL, platform="bugzilla"):
         self.model = model
         self.prompt = prompt
         self.API_KEY = API_KEY
@@ -21,30 +22,30 @@ class Reasoner(Agent):
         self.platform = platform
 
         self.template = {
-            'static': {
-                'role': 'You are an expert in the field of software and system security.',
-                'task': 'Your task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether the code contains [CISB].',
+            "static": {
+                "role": "You are an expert in the field of software and system security.",
+                "task": "Your task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether the code contains [CISB].",
                 # 'definition': '\n[CISB Definition]\n If the compiler\'s optimization induced a security-related bug in the code, then it is CISB.',
-                'description': '\n[Bug Report Structure]\n The report will contain bug id, title, digested description and code logical blocks, formed as a json.',
-                'requirement': '\n[Requirement 1]\n Please be careful not to overthink, nor do you need to suggest anything.'
+                "description": "\n[Bug Report Structure]\n The report will contain bug id, title, digested description and code logical blocks, formed as a json.",
+                "requirement": "\n[Requirement 1]\n Please be careful not to overthink, nor do you need to suggest anything.",
             },
-            'CoT': {
-                'beginning': 'Let us think step by step.',
+            "CoT": {
+                "beginning": "Let us think step by step.",
                 #'draw problem desc': 'Firstly, you need to rephrase the situation described by the reporter as a standardized expression in the computer industry, summarizing its issues within 100 words. If the amount of information in the first comment is too low or the content is confusing, end the inference directly and report the exception.',
-                'code location': 'First, based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them according to call chain. Reason about the approximate location which caused the expectation and reality differing.',
-                'compiler behavior': 'Then, focus on the located code block and analyse possible behavior of the compiler. For example, whether the compiler has optimizations, what platform it is applied to, and what version it is.',
-                'problem analysis': 'Summary if there is conflict between user expectations in that block and assumption of compiler optimization it makes. ',
-                'gap analysis': 'If the reported function failure is truly caused by the conflict, leading to reported bug and it may have security implications(such as check removed, endless loop, etc.), then it is a CISB.',
-                'primary label': 'After analyzing the problem, proclaim if CISB exists.',
-                'early termination': 'If the report lacks enough source code, please end the inference directly and report the exception.',
-                'emphasis': '\n[Requirement 2]\n Remember we do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.',
+                "code location": "First, based on the differences in user descriptions, locate key variables or function calls in the code blocks, trace them according to call chain. Reason about the approximate location which caused the expectation and reality differing.",
+                "compiler behavior": "Then, focus on the located code block and analyse possible behavior of the compiler. For example, whether the compiler has optimizations, what platform it is applied to, and what version it is.",
+                "problem analysis": "Summary if there is conflict between user expectations in that block and assumption of compiler optimization it makes. ",
+                "gap analysis": "If the reported function failure is truly caused by the conflict, leading to reported bug and it may have security implications(such as check removed, endless loop, etc.), then it is a CISB.",
+                "primary label": "After analyzing the problem, proclaim if CISB exists.",
+                "early termination": "If the report lacks enough source code, please end the inference directly and report the exception.",
+                "emphasis": "\n[Requirement 2]\n Remember we do not care if compiler contains a bug, but if the CISB exists in the code. Do not blame nor make value judgment.",
                 # 'reduce hallucination': '\n[Requirement 3]\n User\'s code is not necessarily valid according to language standards, nor his expectation. So Your reasoning do not need to rely on his expectations.'
                 #'summarize and suggest': 'In the end, summarize the information and effectiveness provided by the bug report in one to two sentences, and point out the best practices.'
-            }
+            },
         }
 
     def gather_prompt(self, **kwargs):
-        if self.platform == 'bugzilla':
+        if self.platform == "bugzilla":
             self.prompt = """You are an expert in the field of software and system security.
             \nYour task is to analyse a bug report excerpt from a platform like GCC Bugzilla, determine whether the code contains [CISB].
             \n\n[Bug Report Structure]: The report contains bug id, title, digested description, code logical blocks and review from Bugzilla developers, formed as json.
@@ -79,7 +80,7 @@ class Reasoner(Agent):
             \nDirect implications such as endless loop/program hang, crash, memory corruption, etc. Indirect implications such as data leak, control flow diversion, check removed/bypassed, and more covert like side channel, speculative execution, etc.
             \n\n**CISB Status**: If answers are all [yes], then it is a CISB.
             """
-        elif self.platform == 'kernel':
+        elif self.platform == "kernel":
             self.prompt = """
             You are an expert in the field of software and system security.
             \nYour task is to analyse a commit from Linux kernel, determine whether the patch reveals a potential [CISB].
@@ -118,31 +119,35 @@ class Reasoner(Agent):
         #     for k in self.template[key]:
         #         self.prompt += self.template[key][k] + '\n'
         # return self.prompt
-    
+
     def fetch_example(self, example_filename):
-        with open(f'few_shot/examples/{example_filename}.md', 'r') as f:
+        with open(f"few_shot/examples/{example_filename}.md", "r") as f:
             return f.read()
-    
+
     def fetch_reasoning(self, reasoning_filename):
-        with open(f'few_shot/reasoning/{reasoning_filename}.txt', 'r') as f:
+        with open(f"few_shot/reasoning/{reasoning_filename}.txt", "r") as f:
             return f.read()
 
     def ZS_RO(self, **kwargs):
         self.gather_prompt()
 
         return self.prompt
-    
+
     def FS_RO(self, **kwargs):
-        self.gather_prompt(static = True, CoT = True)
-        
+        self.gather_prompt(static=True, CoT=True)
+
         for key in kwargs:
-            self.shots.append({"role": "user", "content": self.fetch_example(kwargs[key])})
-            self.shots.append({"role": "assistant", "content": self.fetch_reasoning(kwargs[key])})
+            self.shots.append(
+                {"role": "user", "content": self.fetch_example(kwargs[key])}
+            )
+            self.shots.append(
+                {"role": "assistant", "content": self.fetch_reasoning(kwargs[key])}
+            )
         # prompt += '\n[user]\n' + self.fetch_example(kwargs['example1']) + '\n[assistant]\n' + self.fetch_reasoning(kwargs['reasoning1'])
         # prompt += '\n[user]\n' + self.fetch_example(kwargs['example2']) + '\n[assistant]\n' + self.fetch_reasoning(kwargs['reasoning2'])
 
         return self.shots
-    
+
     def chatZS(self, report):
         client = OpenAI(api_key=self.API_KEY, base_url=self.URL)
         # print("reasoning...", self.model)
@@ -151,16 +156,16 @@ class Reasoner(Agent):
             messages=[
                 {"role": "system", "content": self.prompt},
                 {"role": "user", "content": str(report)},
-        ],
+            ],
             # max_tokens=4096,
             temperature=1.0,
-            stream=False
+            stream=False,
         )
 
         # print(response.choices[0].message.content)
         print("Analysis finished.")
         return response
-    
+
     def chatZS_stream(self, report):
         client = OpenAI(api_key=self.API_KEY, base_url=self.URL)
         # print("thinking...", self.model)
@@ -169,10 +174,10 @@ class Reasoner(Agent):
             messages=[
                 {"role": "system", "content": self.prompt},
                 {"role": "user", "content": str(report)},
-        ],
+            ],
             extra_body={"enable_thinking": True},
             temperature=1.0,
-            stream=True
+            stream=True,
         )
 
         # print(response.choices[0].message.content)
@@ -188,11 +193,11 @@ class Reasoner(Agent):
         messages.append({"role": "user", "content": str(report)})
 
         response = client.chat.completions.create(
-            model="deepseek-reasoner",
+            model=self.model,
             messages=messages,
             max_tokens=4096,
             temperature=0.7,
-            stream=False
+            stream=False,
         )
 
         # print(response.choices[0].message.content)
@@ -200,8 +205,10 @@ class Reasoner(Agent):
         return response
 
     def test(self, bug_id):
-        #self.gather_prompt()
-        report = Helper().read_digest(bug_id if self.platform == 'bugzilla' else bug_id[:10])
+        # self.gather_prompt()
+        report = Helper().read_digest(
+            bug_id if self.platform == "bugzilla" else bug_id[:10]
+        )
         if self.model != "":
             response = self.chatZS(report)
             Helper().generate_analysis_report(report, response)
@@ -211,15 +218,15 @@ class Reasoner(Agent):
 
 
 if __name__ == "__main__":
-    #print(report['id'])
+    # print(report['id'])
     # generate_analysis_report(report)
-    model = ""
-    url = ""
+    model = "openrouter/moonshotai/kimi-k2.5"
+    url = "https://openrouter.ai/api/v1"
     api_key = ""
 
-    test = Reasoner(model, None, api_key, url, platform='kernel')
+    test = Reasoner(model, None, api_key, url, platform="kernel")
     test.gather_prompt()
-    test.test('')
+    test.test("")
     # test= Reasoner(model, None, api_key, url)
     # test.gather_prompt()
     # print(test.prompt)

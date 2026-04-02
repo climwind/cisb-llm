@@ -1,0 +1,6 @@
+.venv/
+rag/vector_db/
+__pycache__/
+*.pyc
+*.log
+CISB-study.pdf

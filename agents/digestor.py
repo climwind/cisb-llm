@@ -2,8 +2,9 @@ from agent import Agent
 from openai import OpenAI
 from helper import Helper
 
+
 class Digestor(Agent):
-    '''
+    """
     Digestor agent for creating a bug report digest.
 
     Member variables:
@@ -12,9 +13,9 @@ class Digestor(Agent):
         API_KEY (str): The API key to use for the chat.
         URL (str): The URL to use for the chat.
         platform (str): The platform to use for the chat, e.g., 'bugzilla' or 'kernel'.
-    '''
+    """
 
-    def __init__(self, model, prompt, API_KEY, URL, platform='bugzilla'):
+    def __init__(self, model, prompt, API_KEY, URL, platform="bugzilla"):
         self.model = model
         self.prompt = prompt
         self.API_KEY = API_KEY
@@ -28,18 +29,18 @@ class Digestor(Agent):
             messages=[
                 {"role": "system", "content": self.prompt},
                 {"role": "user", "content": str(input)},
-        ],
+            ],
             max_tokens=4096,
             temperature=1.0,
-            response_format={'type': 'json_object'},
-            stream=False
+            response_format={"type": "json_object"},
+            stream=False,
         )
 
         print("Digest finished.")
         return response
-    
+
     def gather_prompt(self, **kwargs):
-        if self.platform == 'bugzilla':
+        if self.platform == "bugzilla":
             self.prompt = """You are an expert bug report extraction assistant. Your task is to analyze the given bug report and extract key information in JSON format.
             \nThe report will contain bug id, summary, issue body and comments, wholly formed as a json. 
             \nRephrase reporter description in <issue body> as a standardized expression in the computer science field.
@@ -55,7 +56,7 @@ class Digestor(Agent):
             [code block1]: {[functionality], [code]}
             [code block2]: {[functionality], [code]}
             ...\n}"""
-        elif self.platform == 'kernel':
+        elif self.platform == "kernel":
             self.prompt = """You are an expert git commit info extraction assistant. Your task is to analyze the given commit and extract key information in JSON format.
             \nThe report will contain bug id, year, message and patch context, wholly formed as a json. 
             \nRephrase developer description in message as a standardized expression in the computer science field. If the message contains source code, extract and append in the [patch context] naming 'message code'.
@@ -72,25 +73,31 @@ class Digestor(Agent):
             [code block1]: {[before]}
             [code block2]: {[before]}
             ...\n}"""
-        
+
     def test(self, bug_id):
         self.gather_prompt()
         # report = Helper().read_bug_report(bug_id, filename='bug_reports.json')
-        report = Helper().read_commit(bug_id, filename='commits.json')
+        report = Helper().read_commit(bug_id, filename="commits.json")
         response = self.chat(report)
-        with open(f"{bug_id[:10] if self.platform == 'kernel' else bug_id}_digest.json", "w", encoding="utf-8") as f:
+        with open(
+            f"{bug_id[:10] if self.platform == 'kernel' else bug_id}_digest.json",
+            "w",
+            encoding="utf-8",
+        ) as f:
             f.write(response.choices[0].message.content)
-        print(f"Digested the input and generate results: {bug_id[:10] if self.platform == 'kernel' else bug_id}_digest.json")
+        print(
+            f"Digested the input and generate results: {bug_id[:10] if self.platform == 'kernel' else bug_id}_digest.json"
+        )
         return
-        #Helper().generate_digest(report, response)
+        # Helper().generate_digest(report, response)
 
-if __name__ == '__main__':
-    model = ""
-    url = ""
+
+if __name__ == "__main__":
+    model = "openrouter/moonshotai/kimi-k2.5"
+    url = "https://openrouter.ai/api/v1"
     api_key = ""
 
-
-    demo = Digestor(model, None, api_key, url, platform='kernel')
+    demo = Digestor(model, None, api_key, url, platform="kernel")
     # demo.gather_prompt(platform='kernel')
     # print(demo.prompt)
-    demo.test('')
+    demo.test("")

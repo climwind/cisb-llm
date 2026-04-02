@@ -9,11 +9,19 @@ import json
 
 
 class Wrapper:
-
-    def __init__(self, dmodel, rmodel, prompt, API_KEY1, API_KEY2, URL1, URL2, platform='bugzilla'):
+    def __init__(
+        self,
+        dmodel,
+        rmodel,
+        prompt,
+        API_KEY1,
+        API_KEY2,
+        URL1,
+        URL2,
+        platform="bugzilla",
+    ):
         self.digestor = Digestor(dmodel, prompt, API_KEY1, URL1, platform)
         self.reasoner = Reasoner(rmodel, prompt, API_KEY2, URL2, platform)
-        
 
     def gather_prompt(self, **kwargs):
         self.digestor.gather_prompt()
@@ -21,24 +29,28 @@ class Wrapper:
         # self.evalutor.gather_prompt()
 
     def get_analysis(self, report):
-        #self.digestor.gather_prompt()
+        # self.digestor.gather_prompt()
         digest = self.digestor.chat(report)
-        #print(digest.choices[0].message.content)
-        #self.reasoner.ZS_RO()
-        if self.reasoner.model == 'deepseek-reasoner':
-            response = self.reasoner.chatZS(json.loads(digest.choices[0].message.content))
+        # print(digest.choices[0].message.content)
+        # self.reasoner.ZS_RO()
+        if self.reasoner.model == "deepseek-reasoner":
+            response = self.reasoner.chatZS(
+                json.loads(digest.choices[0].message.content)
+            )
         else:
-            response = self.reasoner.chatZS_stream(json.loads(digest.choices[0].message.content))
+            response = self.reasoner.chatZS_stream(
+                json.loads(digest.choices[0].message.content)
+            )
         return response
-    
+
     # def get_evaluation(self, report):
     #     response = self.evalutor.chat(report)
     #     return response
 
     def chat(self, id):
-        report = Helper().read_bug_report(id, filename='commits.json')
+        report = Helper().read_bug_report(id, filename="commits.json")
         analysis = self.get_analysis(report)
-        if self.reasoner.model == 'deepseek-reasoner':
+        if self.reasoner.model == "deepseek-reasoner":
             Helper().generate_analysis_report(report, analysis)
         else:
             Helper().generate_analysis_report_stream(report, analysis)
@@ -46,33 +58,33 @@ class Wrapper:
         # Helper().generate_evaluation(id, evaluation)
 
 
-if __name__ == '__main__':
-    dmodel = ''
+if __name__ == "__main__":
+    dmodel = "openrouter/moonshotai/kimi-k2.5"
     # rmodel = ''
-    rmodel = ''
-    url1 = ''
-    url2 = ''
-    API_KEY1 = ''
-    API_KEY2 = ''
-    platform = 'kernel'  # or 'kernel'
+    rmodel = "openrouter/moonshotai/kimi-k2.5"
+    url1 = "https://openrouter.ai/api/v1"
+    url2 = "https://openrouter.ai/api/v1"
+    API_KEY1 = ""
+    API_KEY2 = ""
+    platform = "kernel"  # or 'kernel'
 
     # chater = Wrapper(dmodel, rmodel, None, API_KEY1, API_KEY1, url1, url1, platform)
     chater = Wrapper(dmodel, rmodel, None, API_KEY1, API_KEY2, url1, url2, platform)
     chater.gather_prompt()
 
-    reports = Helper().read_ids('commits.txt')
-    logs = open('errors.log', 'w')
+    reports = Helper().read_ids("commits.txt")
+    logs = open("errors.log", "w")
     errorIds = []
-    if platform == 'kernel':
+    if platform == "kernel":
         print([id[:10] for id in reports], len(reports))
     else:
         print([id for id in reports], len(reports))
     print("Using reasoning model: ", rmodel)
     confirm = input("No error? (y/n) ")
-    if confirm.lower() != 'y':
+    if confirm.lower() != "y":
         print("Exiting...")
         exit()
-        
+
     for report in reports:
         try:
             chater.chat(report.strip())
@@ -81,7 +93,7 @@ if __name__ == '__main__':
             print(f"Error: {report} chating\n", e)
             errorIds.append(report.strip())
 
-    logs.write('\n'.join(errorIds))
+    logs.write("\n".join(errorIds))
     logs.close()
     print("All reports have been processed. Shutting down...")
     # system('shutdown -s -t 60')
