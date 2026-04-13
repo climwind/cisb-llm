@@ -40,9 +40,17 @@ class Helper:
         filename = (report['id'][:10] if len(report['id']) > 10 else report['id']) + "_analysis.md"
         # filename = "./reports_r1/" + filename
         with open(filename, "w", encoding="utf-8") as f:
-            # f.write("[Reasoning process]\n")
-            # f.write(response.choices[0].message.reasoning_content)
-            f.write("[Generated summary]\n")
+            # Try to extract non-streaming reasoning content if provided by the model
+            reasoning_content = None
+            try:
+                reasoning_content = getattr(response.choices[0].message, "reasoning_content", None)
+            except Exception:
+                reasoning_content = None
+
+            f.write("[Reasoning process]\n")
+            if reasoning_content:
+                f.write(reasoning_content)
+            f.write("\n\n[Generated summary]\n")
             f.write(response.choices[0].message.content)
 
         print(f"Analysed the bug report and generate results: {filename}")
