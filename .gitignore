@@ -16,3 +16,5 @@ results/
 *.zip
 *.codex
 *codeql/*
+conversation_log.md
+re.md
