@@ -1,16 +1,20 @@
 /**
- * @name GCC Optimizer Conditional Store Bypass
- * @description Detects conditional stores to shared memory objects where the condition depends on synchronization state.
- *              This pattern is susceptible to compiler optimizations (e.g., GCC -O2 allow-store-data-races) that remove
- *              the conditional guard, leading to data races and inconsistent shared state.
- * @kind problem
- * @problem.severity warning
- * @precision high
- * @tags security, external/cwe/cwe-362, compiler-optimization
+ * @name Conditional store may be made unconditional by compiler optimization
+ * @description A conditional store to a shared memory object guarded by a synchronization check may be
+ *   optimized into an unconditional store by the compiler, bypassing synchronization and introducing data races.
+ * @kind path-problem
+ * @problem.severity high
+ * @precision medium
+ * @id cpp/conditional-store-optimization
+ * @tags security
+ *       correctness
  */
-import cpp
-import query
 
-from Expr store, Expr cond, Variable syncVar
-where VulnerableCISBPattern::isVulnerableConditionalSharedStore(store, cond, syncVar)
-select store, cond, syncVar, "Conditional store to shared memory guarded by sync variable '$@'. Susceptible to compiler optimization removing the guard."
+import cpp
+import ConditionalStoreLibrary
+
+from Expr store, Expr cond, Variable writtenVar, Variable syncVar
+where conditionalStoreQuery(store, cond, writtenVar, syncVar)
+select store, cond, writtenVar, syncVar,
+  "Conditional store to $" + writtenVar.getName() + " guarded by synchronization variable $" +
+    syncVar.getName() + " may be optimized to unconditional store by compiler."

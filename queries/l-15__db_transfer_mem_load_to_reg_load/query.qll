@@ -1,65 +1,81 @@
 import cpp
-import semmle.code.cpp.dataflow.DataFlow
 
 /**
- * Environment Unit: Represents the implicit ABI/compiler assumption that
- * certain functions (like memset) return their first argument in the return register.
- * This assumption triggers the bug when violated by compiler optimizations.
+ * A function that is expected to return its first argument (e.g., memset, memcpy).
  */
-predicate environment_unit() { any() }
+class MemOpFunction extends Function {
+  MemOpFunction() {
+    exists(string name | name = this.getName() |
+      name = "memset" or
+      name = "__builtin_memset" or
+      name = "memcpy" or
+      name = "__builtin_memcpy" or
+      name = "strcpy" or
+      name = "__builtin_strcpy" or
+      name.matches("%memset") or
+      name.matches("%memcpy") or
+      name.matches("%strcpy")
+    )
+    and
+    exists(Parameter p | p = this.getAParameter() | p.getIndex() = 0)  // has at least one parameter
+    and
+    this.getReturnType() instanceof VoidType = false  // not void
+  }
+
+  /**
+   * Gets the first parameter of this function.
+   */
+  Parameter getFirstParam() {
+    result = this.getParameter(0)
+  }
+}
 
 /**
- * Control Flow Unit: Models the data-flow constraint that the first argument's value
- * must be preserved to the return value across all control flow paths.
- * Returns true if there exists a path where the value is altered without restoration.
+ * Holds if the function `f` has a direct return of its first parameter on all return paths.
  */
-predicate control_flow_unit(Function f, Parameter firstArg) {
-  firstArg = f.getParameter(0) and
-  exists(ReturnStmt ret, VariableAccess va |
-    ret.getEnclosingFunction() = f and
-    ret.hasExpr() and
-    va.getTarget() = firstArg and
-    DataFlow::localExprFlow(va, ret.getExpr())
+predicate returnsFirstParamDirectly(MemOpFunction f) {
+  exists(ReturnStmt rs | rs.getEnclosingFunction() = f |
+    exists(VariableAccess va | va = rs.getExpr() |
+      va.getTarget() = f.getFirstParam()
+    )
+  ) and
+  not exists(ReturnStmt rs2 | rs2.getEnclosingFunction() = f |
+    not (exists(VariableAccess va2 | va2 = rs2.getExpr() |
+      va2.getTarget() = f.getFirstParam()
+    ))
   )
 }
 
 /**
- * Root Cause Unit: Identifies functions that expect to preserve the first argument
- * as the return value but fail to do so due to internal modifications.
+ * Holds if the first parameter of `f` is assigned to anywhere in the function body.
  */
-class RootCauseUnit extends Function {
-  predicate preservesInitialArgValue() {
-    exists(ReturnStmt ret, Expr retExpr |
-      ret.getEnclosingFunction() = this and
-      retExpr = ret.getExpr() and
-      (
-        exists(VariableAccess va |
-          va = retExpr and
-          va.getTarget() = this.getParameter(0)
-        )
-        or
-        retExpr instanceof ThisExpr
+predicate firstParamModified(MemOpFunction f) {
+  exists(AssignExpr a |
+    a.getLValue() instanceof VariableAccess and
+    a.getLValue().(VariableAccess).getTarget() = f.getFirstParam() and
+    a.getEnclosingFunction() = f
+  )
+}
+
+/**
+ * A candidate query result for return register mismatch.
+ */
+class ReturnRegisterMismatch extends MemOpFunction {
+  ReturnRegisterMismatch() {
+    not returnsFirstParamDirectly(this) and
+    exists(ReturnStmt rs | rs.getEnclosingFunction() = this |
+      not exists(VariableAccess va | va = rs.getExpr() |
+        va.getTarget() = this.getFirstParam()
       )
+      or
+      (exists(VariableAccess va | va = rs.getExpr() |
+        va.getTarget() = this.getFirstParam()
+      ) and
+      firstParamModified(this))
     )
   }
 
-  /**
-   * Checks if the function explicitly guarantees preservation of the first argument.
-   * Functions failing this check are candidates for the CISB pattern.
-   */
-  RootCauseUnit() {
-    exists(this.getParameter(0)) and
-    not exists(ReturnStmt ret, Expr retExpr |
-      ret.getEnclosingFunction() = this and
-      retExpr = ret.getExpr() and
-      (
-        exists(VariableAccess va |
-          va = retExpr and
-          va.getTarget() = this.getParameter(0)
-        )
-        or
-        retExpr instanceof ThisExpr
-      )
-    )
+  string toString() {
+    result = this.getName() + " does not return first argument directly."
   }
 }

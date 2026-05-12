@@ -1,40 +1,39 @@
 import cpp
 
-class CallExpr extends FunctionCall {
-  CallExpr() { any() }
+/** A standard memory function that the compiler recognizes as a builtin. */
+class BuiltinMemoryFunction extends Function {
+  BuiltinMemoryFunction() {
+    hasName("memset") or
+    hasName("__builtin_memset") or
+    hasName("memcpy") or
+    hasName("__builtin_memcpy")
+  }
 }
 
-/**
- * Environment Unit: Identifies functions operating in an IO memory context.
- * These functions typically handle device registers or mapped I/O regions where
- * standard memory alignment assumptions do not hold.
- */
-predicate environmentUnit(Function f) {
+/** Holds if the function `f` is an IO memory access wrapper. */
+predicate isIOAccessorFunction(Function f) {
   f.getName().matches("%_io") or
-  f.getName().regexpMatch("ioread[0-9]+") or
-  f.getName().regexpMatch("iowrite[0-9]+") or
-  f.hasName("memcpy_toio") or
-  f.hasName("memcpy_fromio")
+  f.getName() = "memset_io" or
+  f.getName() = "memcpy_fromio" or
+  f.getName() = "memcpy_toio"
 }
 
-/**
- * Control Flow Unit: Captures the direct call relationship between an IO accessor
- * and a standard memory manipulation function.
- */
-predicate controlFlowUnit(CallExpr call, Function caller, Function callee) {
-  environmentUnit(caller) and
-  (callee.hasName("memset") or callee.hasName("memcpy") or
-   callee.hasName("__builtin_memset") or callee.hasName("__builtin_memcpy")) and
-  call.getTarget() = callee and
-  call.getEnclosingFunction() = caller
+/** A call to a builtin memory function inside an IO accessor. */
+class VulnerableCallToBuiltinInIOAccessor extends CallExpr {
+  VulnerableCallToBuiltinInIOAccessor() {
+    exists(Function target, Function enclosing |
+      this.getTarget() = target and
+      target instanceof BuiltinMemoryFunction and
+      this.getEnclosingFunction() = enclosing and
+      isIOAccessorFunction(enclosing)
+    )
+  }
 }
 
-/**
- * Root Cause Unit: Materializes the semantic root cause of the CISB.
- * The vulnerability arises because the compiler treats the callee as a standard builtin,
- * applying optimizations (e.g., alignment-based vectorization or loop unrolling) that
- * are unsafe for IO memory regions.
- */
-predicate rootCauseUnit(CallExpr call, Function caller, Function callee) {
-  controlFlowUnit(call, caller, callee)
+/** Holds if the function `f` contains no volatile asm statement that would block bulk optimization. */
+predicate hasNoVolatileAsmBarrier(Function f) {
+  not exists(AsmStmt asm |
+    asm.getEnclosingFunction() = f and
+    asm.isVolatile()
+  )
 }

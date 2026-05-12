@@ -1,28 +1,16 @@
 /**
- * @name Uninitialized Struct Padding Leak to User Space
- * @description Detects cases where individual field assignments to a struct with implicit padding lead to uninitialized data exposure when copied to user space.
+ * @name Uninitialized struct padding exposed to user space on sparc64
+ * @description On sparc64, structs may contain implicit padding that remains uninitialized when fields are assigned individually. If such a struct is copied to user space, sensitive kernel stack data may be leaked.
  * @kind problem
- * @problem.severity warning
+ * @id cpp/cisb/sparc64-padding-leak
+ * @problem.severity high
  * @precision medium
- * @tags security, external/cwe/CWE-200, cisb, padding-leak
+ * @tags security
  */
 
 import cpp
-import query
+import sparc64PaddingLeakLibrary
 
-from StructWithImplicitPadding structType,
-     Expr structInst,
-     Field f1, Field f2,
-     Stmt assign1, Stmt assign2,
-     Expr userBuf
-where
-  structType.hasPotentialPadding() and
-  structType.getAField() = f1 and
-  structType.getAField() = f2 and
-  f1 != f2 and
-  assignsFieldIndividually(structInst, f1, assign1) and
-  assignsFieldIndividually(structInst, f2, assign2) and
-  lacksAggregateInitialization(structInst) and
-  copiesToUserSpace(structInst, userBuf)
-select structInst, assign1,
-  "Struct instance '{0}' assigned field-by-field without aggregate initialization. Implicit padding may leak uninitialized data to user space."
+from Variable v
+where isSparc64() and structWithUninitializedPadding(v)
+select v, "Struct $@ has uninitialized padding due to individual field assignments and is exposed to user space.", v, v.getName()

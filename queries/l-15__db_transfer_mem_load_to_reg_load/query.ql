@@ -1,14 +1,15 @@
-import cpp
-import query
-
 /**
- * @name Compiler-Introduced Register Corruption via Memset Return Contract Violation
- * @description Detects functions that violate the implicit ABI contract of returning their first argument,
- *              leading to register corruption under GCC optimizations.
+ * @name Return register mismatch in memory operation functions
+ * @description Detects functions expected to return their first argument but return a different value due to modification of the first parameter or return of a different expression.
  * @kind problem
  * @problem.severity error
  * @precision high
+ * @id cpp/return-register-mismatch
+ * @tags security
  */
-from RootCauseUnit func, Parameter firstArg
-where environment_unit() and control_flow_unit(func, firstArg)
-select func, firstArg, "Potential CISB: Function may violate return-register contract under optimization."
+
+import cpp
+import ReturnRegisterMismatchLib
+
+from ReturnRegisterMismatch f
+select f, f.toString()

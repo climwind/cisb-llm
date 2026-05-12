@@ -1,19 +1,19 @@
 /**
- * @name CISB: Const Variable Modified via Pointer Cast
- * @description Detects writes to const-qualified variables through pointer
- *              casts that strip const. The compiler may cache the pre-write
- *              value in a register, causing subsequent reads to observe a
- *              stale value.
+ * @name Const variable modified via pointer cast
+ * @description Writing to a const-qualified variable through a pointer cast invokes undefined behavior;
+ *              compilers may optimize away the write based on assumed immutability.
  * @kind problem
- * @problem.severity warning
+ * @id cpp/const-variable-modification
+ * @problem.severity high
  * @precision medium
- * @id cpp/cisb-const-cast-bypass
- * @tags security, cisb, compiler-optimization
+ * @tags security
+ *       correctness
  */
-import cpp
-import query
 
-from ConstNonVolatileVar cv, Expr writeSite
-where constWriteViaPointer(cv, writeSite)
-select writeSite, "Const variable '$@' is written via pointer cast — compiler may cache stale value.",
-  cv, cv.getName()
+import cpp
+import ConstVarModificationLibrary
+
+from ConstVarModification cvm, VariableDecl v
+where cvm.getModifiedVar() = v
+select cvm, "Modification of const variable '$@' via pointer cast. Declaration: $@.",
+  v, v.getName(), v, "defined here"

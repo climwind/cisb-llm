@@ -1,55 +1,104 @@
 import cpp
-import semmle.code.cpp.dataflow.DataFlow
 
-module VulnerableCISBPattern {
-  class GlobalOrStaticVariable extends Variable {
-    GlobalOrStaticVariable() {
-      this instanceof GlobalVariable or this.hasSpecifier("static")
-    }
-  }
+/**
+ * Holds if `e` is an expression that writes to a global or static variable.
+ * This includes direct assignments and calls to memory clear functions.
+ */
+predicate writesToSharedVariable(Expr e) {
+  // Direct assignment to a global/static variable
+  exists(AssignExpr ass, VariableAccess va |
+    e = ass and
+    ass.getLValue() = va and
+    va.getTarget().isGlobalOrStatic()
+  )
+  or
+  // Function call like memset(), bzero() to a global/static variable
+  exists(FunctionCall call, AddressOfExpr addr, VariableAccess va |
+    e = call and
+    (
+      call.getTarget().hasName("memset") or
+      call.getTarget().hasName("__builtin_memset") or
+      call.getTarget().getName().matches("%memset") or
+      call.getTarget().hasName("bzero") or
+      call.getTarget().hasName("explicit_bzero") or
+      call.getTarget().getName().matches("%bzero") or
+      call.getTarget().getName().matches("__builtin_.*zero")
+    ) and
+    addr = call.getArgument(0) and
+    addr.getOperand() = va and
+    va.getTarget().isGlobalOrStatic()
+  )
+}
 
-  /**
-   * Root cause unit: Stores targeting global or static variables.
-   * These represent shared memory locations susceptible to visibility/race issues.
-   */
-  class SharedMemoryStore extends Expr {
-    SharedMemoryStore() {
-      exists(AssignExpr assign, VariableAccess va, GlobalOrStaticVariable target |
-        this = assign and
-        assign.getLValue().getAChild*() = va and
-        va.getTarget() = target
-      )
-    }
-  }
+/**
+ * Holds if `cond` is an expression that checks a synchronization variable.
+ * The condition can be a relational expression (== / !=) with NULL/0, a logical NOT, or a raw variable use.
+ */
+predicate isConditionOnSyncVariable(Expr cond) {
+  exists(Variable v |
+    cond.(RelationalExpr).getAnOperand().(VariableAccess).getTarget() = v and v.isGlobalOrStatic()
+    or
+    cond.(NotExpr).getOperand().(VariableAccess).getTarget() = v and v.isGlobalOrStatic()
+    or
+    cond.(VariableAccess).getTarget() = v and v.isGlobalOrStatic()
+  )
+}
 
-  /**
-   * Control flow unit: Guards a store with a condition.
-   * Models the source-level branching structure that compilers may flatten.
-   */
-  predicate isGuardedByCondition(Expr store, Expr cond) {
+/**
+ * A pattern where a conditional store to a shared variable is guarded by a condition on a synchronization variable.
+ */
+class ConditionalStore extends Expr {
+  Expr condition;
+  Variable writtenVar;
+  Variable syncVar;
+
+  ConditionalStore() {
     exists(IfStmt ifStmt |
-      ifStmt.getCondition() = cond and
-      ifStmt.getThen().getAChild*() = store
+      this.getEnclosingStmt().getParentStmt*() = ifStmt and
+      (
+        this.getEnclosingStmt() = ifStmt.getThen() or
+        this.getEnclosingStmt() = ifStmt.getElse()
+      ) and
+      condition = ifStmt.getCondition() and
+      isConditionOnSyncVariable(condition) and
+      writesToSharedVariable(this) and
+      exists(VariableAccess va |
+        condition.getAChild*() = va and
+        syncVar = va.getTarget()
+      ) and
+      exists(VariableAccess va2 |
+        this.getAChild*() = va2 and
+        writtenVar = va2.getTarget() and
+        writtenVar.isGlobalOrStatic() and
+        writtenVar != syncVar
+      )
     )
   }
 
   /**
-   * Environment/Data flow unit: Condition depends on a synchronization variable.
-   * Establishes the shared-state dependency required for the CISB trigger.
+   * Gets the condition expression guarding the store.
    */
-  predicate dependsOnSyncVariable(Expr cond, Variable syncVar) {
-    exists(VariableAccess va |
-      va.getTarget() = syncVar and
-      DataFlow::localExprFlow(va, cond)
-    )
-  }
+  Expr getCondition() { result = condition }
 
   /**
-   * Composed CISB pattern: Conditional store to shared memory gated by sync state.
+   * Gets the variable being written.
    */
-  predicate isVulnerableConditionalSharedStore(Expr store, Expr cond, Variable syncVar) {
-    store instanceof SharedMemoryStore and
-    isGuardedByCondition(store, cond) and
-    dependsOnSyncVariable(cond, syncVar)
-  }
+  Variable getWrittenVariable() { result = writtenVar }
+
+  /**
+   * Gets the synchronization variable used in the condition.
+   */
+  Variable getSyncVariable() { result = syncVar }
+}
+
+/**
+ * A query predicate that exposes all instances for use in .ql files.
+ */
+query predicate conditionalStoreQuery(Expr store, Expr cond, Variable writtenVar, Variable syncVar) {
+  exists(ConditionalStore cs |
+    store = cs and
+    cond = cs.getCondition() and
+    writtenVar = cs.getWrittenVariable() and
+    syncVar = cs.getSyncVariable()
+  )
 }

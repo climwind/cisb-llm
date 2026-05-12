@@ -1,22 +1,19 @@
 /**
- * @name Unaligned Struct Access via Compiler Alignment Assumption
- * @description Detects memory accesses to structs lacking explicit alignment attributes,
- *              where compiler optimizations assume natural alignment, potentially causing
- *              unaligned access faults on strict-alignment architectures.
+ * @id cpp/unaligned-struct-access-missing-alignment-attribute
+ * @name Unaligned memory access due to missing struct alignment attributes
+ * @description A memory access (struct assignment, memcpy, pointer dereference, array access) involves a struct type without __packed or __aligned attributes. Compiler may generate aligned load/store instructions causing faults on strict-alignment architectures.
  * @kind problem
- * @problem.severity warning
- * @precision high
- * @id cpp/unaligned-struct-access-cisb
- * @tags security, external/cwe-119, cisb
+ * @problem.severity error
+ * @precision medium
+ * @tags security
+ *       compiler-introduced
+ *       CISB
+ *       alignment
  */
-import cpp
-import query
 
-from RootCauseUnit typeDef,
-     Expr accessSite,
-     Expr ptrSource
-where
-  accessSite.getType() = typeDef and
-  controlFlowUnit(ptrSource, accessSite) and
-  environmentUnit(accessSite)
-select accessSite, "Unaligned memory access detected: compiler assumes natural alignment for struct '{0}', but pointer may be misaligned.", typeDef.getName()
+import cpp
+import query::UnalignedStructAccess
+
+from PotentialUnalignedAccess access, Struct s
+where access.getStruct() = s
+select access, "Potential unaligned access to struct '" + s.getName() + "' which lacks alignment attributes."

@@ -1,18 +1,22 @@
 /**
- * @name GCC Jump Table Retpoline Bypass (Spectre v2)
- * @description Detects switch statements likely compiled with jump tables, 
- *              which bypass retpoline mitigations and introduce Spectre v2 risks.
+ * @name Large switch statement with retpoline enabled
+ * @description Switch statements with many cases may be compiled using jump tables,
+ *   which under CONFIG_RETPOLINE produce indirect jumps vulnerable to Spectre v2.
+ *   This query flags such switches when -fno-jump-tables is not used.
  * @kind problem
- * @problem.severity warning
- * @precision high
- * @tags security, cisb, spectre-v2, compiler-bug
+ * @problem.severity high
+ * @precision medium
+ * @id cpp/switch-retpoline-jump-table
+ * @tags security
+ *      spectre
+ *      retpoline
  */
 
 import cpp
-import query
+import LargeSwitchRetpoline
 
-from SwitchStmt s, SwitchJumpTableTrigger t
-where t = s and triggersIndirectJumpDispatch(s)
-      and lacksJumpTableMitigation()
-      and isRetpolineSensitiveContext()
-select s, "Switch statement with >20 cases likely uses a jump table, bypassing retpoline mitigations and introducing Spectre v2 risk."
+from LargeSwitch ls
+where
+  isRetpolineDefined() and
+  not hasJumpTablesDisabled()
+select ls, "This switch statement with $@ cases compiled under CONFIG_RETPOLINE may generate a jump table with vulnerable indirect jumps.", ls.getNumberOfCaseStmts()

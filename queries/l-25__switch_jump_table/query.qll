@@ -1,51 +1,32 @@
 import cpp
 
 /**
- * @name CISB: GCC Jump Table Retpoline Bypass Library
- * @description Reusable semantic units for detecting switch statements 
- *              vulnerable to Spectre v2 due to compiler-generated jump tables.
+ * A SwitchStatement that is likely to be compiled into a jump table
+ * due to having many case labels. A large number of cases triggers
+ * GCC's heuristic to emit a jump table for efficient dispatch.
  */
-
-/**
- * @brief Root Cause Unit
- * Represents the switch statement node that serves as the entry point 
- * for the compiler-introduced indirect jump mechanism.
- */
-class SwitchJumpTableTrigger extends Stmt {
-  SwitchJumpTableTrigger() {
-    this instanceof SwitchStmt
+class LargeSwitch extends SwitchStatement {
+  LargeSwitch() {
+    this.getNumberOfCaseStmts() > 20
   }
 }
 
 /**
- * @brief Control Flow Unit
- * Determines if a switch statement exhibits the structural characteristics 
- * that trigger the compiler to generate a jump table (indirect jump dispatch).
- * Based on historical GCC behavior: > 20 cases typically trigger jump tables.
+ * Holds if the macro CONFIG_RETPOLINE is defined in any preprocessor
+ * directive in the database. This indicates retpoline mitigations are
+ * enabled for the kernel build.
  */
-predicate triggersIndirectJumpDispatch(SwitchStmt s) {
-  count(s.getASwitchCase()) > 20
+predicate isRetpolineDefined() {
+  any(MacroDefinition d | d.getName() = "CONFIG_RETPOLINE")
 }
 
 /**
- * @brief Environment Unit
- * Models the absence of the `-fno-jump-tables` compiler flag.
- * In practice, this would be verified against compilation database entries.
- * Defined here as a predicate to satisfy the CISB environmental assumption.
+ * Placeholder for checking whether -fno-jump-tables flag is present.
+ * Since compiler flags are not directly accessible in CodeQL,
+ * this predicate should be overridden by the query if the flag
+ * can be determined from build metadata. By default, assume flag
+ * is NOT present, which is the vulnerable case.
  */
-predicate lacksJumpTableMitigation() {
-  // Abstracted for standalone query execution. 
-  // Assumes mitigation is absent unless explicitly configured otherwise.
-  any()
-}
-
-/**
- * @brief Environment Unit
- * Models the presence of a security-hardened context requiring retpoline mitigations.
- * Corresponds to configurations like CONFIG_RETPOLINE in the Linux kernel.
- */
-predicate isRetpolineSensitiveContext() {
-  // Abstracted for standalone query execution.
-  // Assumes security context is active based on CISB definition.
-  any()
+predicate hasJumpTablesDisabled() {
+  none() // Always false, meaning jump tables are NOT disabled
 }

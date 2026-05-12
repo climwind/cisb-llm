@@ -1,86 +1,59 @@
 import cpp
 
-// =============================================================================
-// Phase 1: Syntax Anchor — pure AST matching
-// =============================================================================
-
 /**
- * An address-of expression whose operand is a field access.
- * Matches: &ptr->field, &((T*)ptr)->field, &(*ptr).field, &obj.field
+ * A predicate that holds if `cond` is an expression that checks that `memberAddr` is non-null.
+ * `memberAddr` is an address-of-member expression.
  */
-class MemberAddressExpr extends AddressOfExpr {
-  MemberAddressExpr() {
-    this.getOperand() instanceof FieldAccess
-  }
-
-  FieldAccess getFieldAccess() {
-    result = this.getOperand()
-  }
-
-  Field getField() { result = this.getFieldAccess().getTarget() }
-
-  Expr getBase() { result = this.getFieldAccess().getQualifier() }
+predicate isNonNullCondition(Expr cond, Expr memberAddr) {
+  // Form: memberAddr != 0
+  exists(NEExpr ne |
+    cond = ne and
+    ne.getLeftOperand() = memberAddr and
+    ne.getRightOperand().(Literal).getValue() = "0"
+  )
+  or
+  // Form: !(memberAddr == 0)
+  exists(NotExpr ne, EQExpr eq |
+    cond = ne and
+    ne.getOperand() = eq and
+    eq.getLeftOperand() = memberAddr and
+    eq.getRightOperand().(Literal).getValue() = "0"
+  )
+  or
+  // Form: implicit boolean conversion on memberAddr (e.g., if(&ptr->member))
+  cond = memberAddr
 }
 
 /**
- * A null-like literal: 0, NULL, nullptr, or any expression of null pointer type.
+ * A class representing an expression that takes the address of a struct member.
  */
-private predicate isNullLike(Expr e) {
-  e.getValueText() = "0" or
-  e.getValueText() = "NULL" or
-  e instanceof NullPointerType  // C++ nullptr
+class MemberAddressExpression extends Expr {
+  FieldAccess fa;
+
+  MemberAddressExpression() {
+    this.(AddressOfExpr).getOperand() = fa
+  }
+
+  /** Gets the field access inside the address expression. */
+  FieldAccess getFieldAccess() { result = fa }
 }
 
 /**
- * A null-check that involves a MemberAddressExpr.
- *
- * Covers ALL syntactic forms (from equivalence_notes):
- *   Form A: &ptr->field == NULL       → EQExpr(MemberAddressExpr, null)
- *   Form B: &ptr->field != NULL       → NEExpr(MemberAddressExpr, null)
- *   Form C: !&ptr->field              → NotExpr(MemberAddressExpr)
- *   Form D: !(&ptr->field == NULL)    → NotExpr(EQExpr(MemberAddressExpr, null))
- *   Form E: &ptr->field as condition  → MemberAddressExpr used as branch cond
+ * A loop whose condition contains a non-null check on a struct member address,
+ * where the member offset is greater than 0.
  */
-class MemberAddressNullCheck extends Expr {
-  MemberAddressNullCheck() {
-    exists(MemberAddressExpr mae |
-      // Form A: &ptr->field == NULL / == 0
-      (this instanceof EQExpr and
-       this.(EQExpr).hasOperands(mae, any(Expr other | isNullLike(other))))
-      or
-      // Form B: &ptr->field != NULL / != 0
-      (this instanceof NEExpr and
-       this.(NEExpr).hasOperands(mae, any(Expr other | isNullLike(other))))
-      or
-      // Form C: !&ptr->field
-      (this instanceof NotExpr and
-       this.(NotExpr).getOperand() = mae)
-      or
-      // Form D: !(&ptr->field == NULL)
-      (this instanceof NotExpr and
-       this.(NotExpr).getOperand() instanceof EQExpr and
-       this.(NotExpr).getOperand().(EQExpr).hasOperands(mae, any(Expr other | isNullLike(other))))
-      or
-      // Form E: &ptr->field used directly as a condition (implicit != 0)
-      // (this = mae when mae is not part of any comparison)
-      (this = mae and
-       not this instanceof ComparisonOperation and
-       not this.getParent*() instanceof ComparisonOperation and
-       not this.getParent*() instanceof NotExpr)
+class VulnerableLoop extends Loop {
+  MemberAddressExpression memberAddr;
+
+  VulnerableLoop() {
+    exists(Expr cond, FieldAccess fa |
+      cond = this.getCondition() and
+      isNonNullCondition(cond, memberAddr) and
+      fa = memberAddr.getFieldAccess() and
+      fa.getTarget().(DataMember).getByteOffset() > 0
     )
   }
-}
 
-// =============================================================================
-// Phase 2: Semantic Constraints (TODO — layered in later)
-// =============================================================================
-//
-// 1. The field has a positive byte offset from the struct base:
-//    f.getByteOffset() > 0
-//    (This is what makes the null check "provably always true/false")
-//
-// 2. The pointer base comes from an external source (parameter, global,
-//    or function return) — not a stack variable with known address.
-//
-// 3. The null check guards a security-relevant operation (memory access,
-//    privileged operation, bounds check, etc.).
+  /** Gets the member address expression involved in the condition. */
+  MemberAddressExpression getMemberAddress() { result = memberAddr }
+}

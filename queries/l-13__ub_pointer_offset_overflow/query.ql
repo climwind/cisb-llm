@@ -1,17 +1,19 @@
 /**
- * @name CISB: Null Check on Struct Member Address Optimized Away
- * @description Detects null checks on the address of a struct member
- *              (&ptr->field == NULL). When the field has a positive offset
- *              from the struct base, the compiler proves the check is
- *              always-false and eliminates it entirely.
+ * @id cpp/clang-optimization-removes-null-check-on-member-address
+ * @name Clang optimization removes null check on struct member address in loop condition
+ * @description Detects loops where the condition checks if the address of a struct member is non-null,
+ *              which Clang may optimize to always-true when the member offset > 0, causing infinite loops.
  * @kind problem
  * @problem.severity warning
  * @precision medium
- * @id cpp/cisb-member-address-null-check
- * @tags security, cisb, compiler-optimization
+ * @tags security
+ *       compiler-introduced
+ *       infinite-loop
+ *       clang-optimization
  */
-import cpp
-import query
 
-from MemberAddressNullCheck check
-select check, "Null check on struct member address — may be eliminated by compiler if field offset > 0."
+import cpp
+import MemberAddressNullCheck
+
+from VulnerableLoop vl
+select vl, "Loop condition contains a null check on struct member address that Clang may optimize to always-true, potentially causing infinite loop."

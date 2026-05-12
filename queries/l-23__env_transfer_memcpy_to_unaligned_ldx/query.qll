@@ -1,46 +1,64 @@
 import cpp
-import semmle.code.cpp.dataflow.DataFlow
 
-class AccessExpr extends Access {
-  AccessExpr() { any() }
-}
-
-class CallExpr extends FunctionCall {
-  CallExpr() { any() }
+/**
+ * Holds if the struct type `t` lacks explicit alignment attributes
+ * (no __packed, no __aligned, and no gcc::packed or gcc::aligned attributes).
+ */
+predicate structLacksAlignmentAttribute(Struct t) {
+  not exists(Attribute a |
+    a = t.getDecl().getADeclEntry().getAnAttribute() and
+    (a.getName() = "packed" or a.getName() = "aligned" or
+     a.getName() = "__packed__" or a.getName() = "__aligned__" or
+     a.getName() = "gcc::packed" or a.getName() = "gcc::aligned"))
 }
 
 /**
- * Root Cause Unit: Captures struct types that lack explicit alignment attributes
- * but are sized for natural alignment optimization (e.g., 8 bytes).
- * Models the implicit specification conflict where the compiler assumes alignment.
+ * A memory access that may be unaligned due to missing struct alignment attributes.
  */
-class RootCauseUnit extends Type {
-  RootCauseUnit() {
-    this instanceof Struct and
-    not this.getAnAttribute().hasName("aligned") and
-    this.getSize() = 8
+class PotentialUnalignedAccess extends Expr {
+  Struct targetStruct;
+
+  PotentialUnalignedAccess() {
+    exists(Struct s | structLacksAlignmentAttribute(s) and
+      (
+        // Struct assignment: both sides have same struct type s
+        exists(AssignExpr ae |
+          ae.getLValue().getType().stripType() = s and
+          ae.getRValue().getType().stripType() = s and
+          this = ae
+        )
+        or
+        // memcpy call with size = sizeof(s)
+        exists(Call c |
+          c.getTarget().getName().matches("%memcpy") and
+          c.getArgument(2).getValue().toInt() = s.getSize() and
+          (c.getArgument(0).getType().stripType() = s or
+           c.getArgument(1).getType().stripType() = s) and
+          this = c
+        )
+        or
+        // Pointer dereference (load/store via pointer to s)
+        exists(PointerDereferenceExpr pd |
+          pd.getOperand().getType().stripType().(PointerType).getBaseType() = s and
+          this = pd
+        )
+        or
+        // Array access: p[i] where p is pointer to s
+        exists(ArrayExpr ae |
+          ae.getArray().getType().stripType().(PointerType).getBaseType() = s and
+          this = ae
+        )
+      ) and
+      targetStruct = s
+    )
   }
+
+  Struct getStruct() { result = targetStruct }
 }
 
 /**
- * Control Flow Unit: Traces data flow from a potentially misaligned pointer source
- * to the memory access site, ensuring no intervening alignment correction occurs.
+ * Holds if the expression `e` is a potential unaligned access to struct `s`.
  */
-predicate controlFlowUnit(Expr ptrSource, Expr accessSite) {
-  DataFlow::localExprFlow(ptrSource, accessSite) and
-  not hasAlignmentFix(ptrSource, accessSite)
-}
-
-predicate hasAlignmentFix(Expr start, Expr end) {
-  // Abstract representation of CFG traversal checking for alignment corrections
-  none()
-}
-
-/**
- * Environment Unit: Filters for access operations that trigger on strict-alignment
- * architectures due to their size and nature, representing the environmental constraint.
- */
-predicate environmentUnit(Expr access) {
-  access.getType().getSize() = 8 and
-  (access instanceof AccessExpr or access instanceof CallExpr)
+predicate isPotentialUnalignedAccess(Expr e, Struct s) {
+  e.(PotentialUnalignedAccess).getStruct() = s
 }

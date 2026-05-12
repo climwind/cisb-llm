@@ -1,69 +1,42 @@
 import cpp
 
-// =============================================================================
-// Phase 1: Syntax Anchor — pure AST matching
-// =============================================================================
-
-/**
- * A variable declared with `const` but not `volatile`.
- * The compiler may assume its value never changes and cache it in a register.
- */
-class ConstNonVolatileVar extends Variable {
-  ConstNonVolatileVar() {
-    this.isConst() and not this.isVolatile()
-  }
+/** A variable declared with const and without volatile. */
+predicate isConstWithoutVolatile(VariableDecl v) {
+  v.getType().hasConstQualifier() and
+  not v.getType().hasVolatileQualifier()
 }
 
-/**
- * A write (assignment / increment / decrement) whose left-hand side
- * reaches a ConstNonVolatileVar through any chain of pointer casts
- * and dereferences.
- *
- * This is the irreducible syntactic signature of "const bypass":
- * some write operation somewhere in the code has a path to a const
- * variable that goes through at least one pointer indirection
- * (AddressOfExpr, PointerDereferenceExpr, or Cast).
- *
- * Covers ALL syntactic spellings:
- *   *(T*)&cv        = val;
- *   ((T*)&cv)->f    = val;
- *   *(T*)(uintptr_t)&cv = val;
- *   (*(T**)ptr)     = &cv;   (via intermediate pointer)
- */
-predicate constWriteViaPointer(ConstNonVolatileVar cv, Expr writeSite) {
-  exists(AssignExpr assign, VariableAccess va |
-    writeSite = assign and
-    // The lvalue eventually reaches a VariableAccess to cv
-    assign.getLValue().getAChild*() = va and
-    va.getTarget() = cv and
-    // At least one pointer-level operation exists between write and cv
-    exists(AddressOfExpr addr |
-      assign.getLValue().getAChild*() = addr
-    )
-  )
+/** Holds if expression `e` is an address-of of variable `v` followed by zero or more casts. */
+predicate addressesVar(Expr e, VariableDecl v) {
+  exists(AddressOfExpr aoe | aoe.getOperand() = v.getAnAccess() and e = aoe)
   or
-  exists(CrementOperation incdec, VariableAccess va |
-    writeSite = incdec and
-    incdec.getOperand().getAChild*() = va and
-    va.getTarget() = cv and
-    exists(AddressOfExpr addr |
-      incdec.getOperand().getAChild*() = addr
-    )
-  )
+  exists(CastExpr ce, Expr sub | ce = e and addressesVar(sub, v))
 }
 
-// =============================================================================
-// Phase 2: Semantic Constraints (TODO — layered in later)
-// =============================================================================
-//
-// 1. The const variable is READ before the write (compiler caches the value):
-//    A VariableAccess to cv appears as an rvalue before the writeSite in
-//    control-flow order.
-//
-// 2. No compiler barrier between the cached read and the write:
-//    No volatile access, asm barrier, or function call that would force
-//    the compiler to reload cv.
-//
-// 3. (Optional) The stale cached value is used in a security check:
-//    The read before the write is part of a null-check, bounds-check,
-//    or access-control decision.
+/** Holds if expression `target` is a write target (LHS of assignment or first argument of memory copy). */
+predicate isWriteTarget(Expr target) {
+  exists(AssignExpr ae | ae.getLValue() = target)
+  or
+  exists(FunctionCall fc |
+    fc.getTarget().hasName("memcpy") or fc.getTarget().hasName("__builtin_memcpy") or fc.getTarget().getName().matches("%memcpy") or
+    fc.getTarget().hasName("memmove") or fc.getTarget().hasName("__builtin_memmove") or fc.getTarget().getName().matches("%memmove") or
+    fc.getTarget().hasName("memset") or fc.getTarget().hasName("__builtin_memset") or fc.getTarget().getName().matches("%memset") or
+    fc.getTarget().hasName("strcpy") or fc.getTarget().hasName("__builtin_strcpy") or fc.getTarget().getName().matches("%strcpy") or
+    fc.getTarget().hasName("strncpy") or fc.getTarget().hasName("__builtin_strncpy") or fc.getTarget().getName().matches("%strncpy")
+  ) and
+  fc.getArgument(0) = target
+}
+
+/** A write operation that modifies a const variable through a pointer cast. */
+class ConstVarModification extends Expr {
+  VariableDecl v;
+
+  ConstVarModification() {
+    isWriteTarget(this) and
+    exists(Expr addr | addressesVar(addr, v) and exists(CastExpr ce | ce = this.getAChild*() and ce.getTargetType().hasConstQualifier())) and
+    isConstWithoutVolatile(v)
+  }
+
+  /** Gets the const variable being modified. */
+  VariableDecl getModifiedVar() { result = v }
+}

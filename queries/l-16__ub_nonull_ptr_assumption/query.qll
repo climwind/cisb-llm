@@ -1,77 +1,92 @@
+/**
+ * Provides predicates and classes for detecting CISB related to GCC inline assembly
+ * memory operands causing null check elimination.
+ */
+
 import cpp
 import semmle.code.cpp.controlflow.Dominance
 
-class InlineAsmStmt extends AsmStmt {
-  InlineAsmStmt() { any() }
-}
-
-private predicate exprReferencesVariable(Expr e, Variable var) {
-  exists(VariableAccess va |
-    va.getTarget() = var and
-    e.getAChild*() = va
-  )
-}
-
-private predicate isNullLike(Expr e) {
-  e.getValueText() = "0" or
-  e.getValueText() = "NULL" or
-  e.getType() instanceof NullPointerType
-}
-
 /**
- * @brief Root cause unit: Identifies inline assembly statements that contain a memory operand dereferencing a variable.
- * Matches patterns like *(T*)ptr or ptr->field inside asm blocks.
+ * Holds if `expr` is a dereference of pointer variable `v`, accounting for casts and field access.
  */
-predicate rootCauseUnit(InlineAsmStmt stmt, Variable var) {
-  exists(PointerDereferenceExpr deref |
-    stmt.getAChild*() = deref and
-    exprReferencesVariable(deref.getOperand(), var)
+predicate pointerDerefOf(Expr expr, Variable v) {
+  exists(DereferenceExpr deref |
+    deref = expr.getAChild*()
+  |
+    deref.getOperand().getAChild*() = any(VariableAccess va | va.getTarget() = v)
   )
   or
-  exists(PointerFieldAccess mem |
-    stmt.getAChild*() = mem and
-    exprReferencesVariable(mem.getQualifier(), var)
+  exists(FieldAccess fa |
+    fa = expr.getAChild*()
+  |
+    fa.getQualifier().getAChild*() = any(VariableAccess va | va.getTarget() = v)
+  )
+  or
+  exists(AddressOfExpr addr |
+    addr = expr.getAChild*()
+  |
+    addr.getOperand().getAChild*() = any(VariableAccess va | va.getTarget() = v)
   )
 }
 
 /**
- * @brief Control flow unit: Identifies null checks on the same variable that are dominated by the inline asm statement.
- * Ensures the null check appears later in the execution order.
+ * Holds if `asm` is an inline assembly statement that has a memory operand
+ * (constraint containing 'm') whose expression dereferences variable `v`.
  */
-predicate controlFlowUnit(InlineAsmStmt asmStmt, Variable var, IfStmt ifStmt) {
-  asmStmt.getEnclosingFunction() = ifStmt.getEnclosingFunction() and
-  dominates(asmStmt, ifStmt) and
-  isNullCheck(ifStmt, var)
+predicate asmMemoryDerefOperand(AsmStmt asm, Variable v) {
+  exists(AsmOperand operand | operand = asm.getAnOperand() |
+    (operand.getConstraint().matches("=*m*") or operand.getConstraint().matches("*m*")) and
+    pointerDerefOf(operand.getExpression(), v)
+  )
 }
 
 /**
- * @brief Helper: Determines if an IfStmt condition performs a null check on a given variable.
- * Normalizes across == NULL, != NULL, !ptr, and ptr < 0 forms.
+ * A null check expression on a pointer variable.
  */
-predicate isNullCheck(IfStmt ifStmt, Variable var) {
-  exists(Expr cond |
-    ifStmt.getCondition() = cond and
-    (
-      exists(ComparisonOperation cmp, VariableAccess va, Expr other |
-        cmp = cond and
-        (cmp.getOperator() = "==" or cmp.getOperator() = "!=" or
-         cmp.getOperator() = "<" or cmp.getOperator() = ">") and
-        cmp.hasOperands(va, other) and
-        va.getTarget() = var and
-        isNullLike(other)
-      )
-      or
-      exists(NotExpr un, VariableAccess va |
-        un = cond and
-        va = un.getOperand() and
-        va.getTarget() = var
+class NullCheckExpr extends Expr {
+  Variable checkedVar;
+
+  NullCheckExpr() {
+    exists(Variable v |
+      checkedVar = v and
+      (
+        // v == NULL or v == 0
+        exists(EQExpr eq | eq = this and
+          (eq.getLeftOperand().getAChild*() = any(VariableAccess va | va.getTarget() = v) and
+           (eq.getRightOperand().getValue().toInt() = 0 or eq.getRightOperand().getValue().toInt() = -1))
+          or
+          (eq.getRightOperand().getAChild*() = any(VariableAccess va | va.getTarget() = v) and
+           (eq.getLeftOperand().getValue().toInt() = 0 or eq.getLeftOperand().getValue().toInt() = -1))
+        )
+        or
+        // v != NULL or v != 0
+        exists(NEExpr ne | ne = this and
+          (ne.getLeftOperand().getAChild*() = any(VariableAccess va | va.getTarget() = v) and
+           (ne.getRightOperand().getValue().toInt() = 0 or ne.getRightOperand().getValue().toInt() = -1))
+          or
+          (ne.getRightOperand().getAChild*() = any(VariableAccess va | va.getTarget() = v) and
+           (ne.getLeftOperand().getValue().toInt() = 0 or ne.getLeftOperand().getValue().toInt() = -1))
+        )
+        or
+        // !v
+        exists(NotExpr not | not = this and not.getOperand().getAChild*() = any(VariableAccess va | va.getTarget() = v))
+        or
+        // if(v) - implicit conversion to bool
+        exists(ImplicitConversion conv | conv = this and conv.getExpr().getAChild*() = any(VariableAccess va | va.getTarget() = v) and
+          conv.getType() instanceof BoolType)
       )
     )
-  )
+  }
+
+  Variable getCheckedVariable() { result = checkedVar }
 }
 
 /**
- * @brief Environment unit: Documents the compiler optimization context required for this CISB.
- * Note: Static analysis cannot detect compiler flags at query time; this unit captures the necessary assumption.
+ * Holds if the inline assembly statement `asm` precedes the null check `check` in the same function,
+ * and the asm dominates the null check in the control flow graph.
  */
-predicate environmentUnit() { any() }
+predicate asmDominatesNullCheck(AsmStmt asm, NullCheckExpr check) {
+  asm.getFunction() = check.getFunction() and
+  asm.getLocation() < check.getLocation() and
+  dominates(asm, check)
+}
