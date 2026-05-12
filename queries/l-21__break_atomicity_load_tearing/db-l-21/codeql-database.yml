@@ -1,0 +1,12 @@
+---
+sourceLocationPrefix: /home/test/my-awesome-project/cisb-llm/queries/l-21__break_atomicity_load_tearing
+baselineLinesOfCode: 76
+unicodeNewlines: false
+columnKind: utf8
+primaryLanguage: cpp
+creationMetadata:
+  cliVersion: 2.25.1
+  creationTime: 2026-05-12T03:37:51.189045567Z
+overlayBaseDatabase: false
+overlayDatabase: false
+finalised: true

@@ -1,0 +1,12 @@
+---
+sourceLocationPrefix: /home/test/my-awesome-project/cisb-llm/queries/l-46__ub_race_and_reorder
+baselineLinesOfCode: 65
+unicodeNewlines: false
+columnKind: utf8
+primaryLanguage: cpp
+creationMetadata:
+  cliVersion: 2.25.1
+  creationTime: 2026-05-12T03:48:50.614806359Z
+overlayBaseDatabase: false
+overlayDatabase: false
+finalised: true

@@ -1,0 +1,12 @@
+---
+sourceLocationPrefix: /home/test/my-awesome-project/cisb-llm/queries/l-30__ub_concurrency_access_to_global_between_2_func_call_which_contains_access_to_same_global
+baselineLinesOfCode: 22
+unicodeNewlines: false
+columnKind: utf8
+primaryLanguage: cpp
+creationMetadata:
+  cliVersion: 2.25.1
+  creationTime: 2026-05-12T03:39:50.507062266Z
+overlayBaseDatabase: false
+overlayDatabase: false
+finalised: true

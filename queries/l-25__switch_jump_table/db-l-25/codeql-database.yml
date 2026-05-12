@@ -1,0 +1,12 @@
+---
+sourceLocationPrefix: /home/test/my-awesome-project/cisb-llm/queries/l-25__switch_jump_table
+baselineLinesOfCode: 25
+unicodeNewlines: false
+columnKind: utf8
+primaryLanguage: cpp
+creationMetadata:
+  cliVersion: 2.25.1
+  creationTime: 2026-05-12T03:38:58.326406622Z
+overlayBaseDatabase: false
+overlayDatabase: false
+finalised: true

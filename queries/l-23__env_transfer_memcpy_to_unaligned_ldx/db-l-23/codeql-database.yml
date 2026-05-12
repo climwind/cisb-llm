@@ -1,0 +1,12 @@
+---
+sourceLocationPrefix: /home/test/my-awesome-project/cisb-llm/queries/l-23__env_transfer_memcpy_to_unaligned_ldx
+baselineLinesOfCode: 18
+unicodeNewlines: false
+columnKind: utf8
+primaryLanguage: cpp
+creationMetadata:
+  cliVersion: 2.25.1
+  creationTime: 2026-05-12T03:38:20.422199497Z
+overlayBaseDatabase: false
+overlayDatabase: false
+finalised: true

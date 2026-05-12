@@ -1,0 +1,12 @@
+---
+sourceLocationPrefix: /home/test/my-awesome-project/cisb-llm/queries/l-43__env_built_in_replace
+baselineLinesOfCode: 8
+unicodeNewlines: false
+columnKind: utf8
+primaryLanguage: cpp
+creationMetadata:
+  cliVersion: 2.25.1
+  creationTime: 2026-05-12T03:47:59.680185745Z
+overlayBaseDatabase: false
+overlayDatabase: false
+finalised: true

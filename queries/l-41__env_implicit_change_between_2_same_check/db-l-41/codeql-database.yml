@@ -1,0 +1,12 @@
+---
+sourceLocationPrefix: /home/test/my-awesome-project/cisb-llm/queries/l-41__env_implicit_change_between_2_same_check
+baselineLinesOfCode: 47
+unicodeNewlines: false
+columnKind: utf8
+primaryLanguage: cpp
+creationMetadata:
+  cliVersion: 2.25.1
+  creationTime: 2026-05-12T03:46:03.636248072Z
+overlayBaseDatabase: false
+overlayDatabase: false
+finalised: true

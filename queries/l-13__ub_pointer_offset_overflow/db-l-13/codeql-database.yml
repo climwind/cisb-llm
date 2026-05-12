@@ -1,0 +1,12 @@
+---
+sourceLocationPrefix: /home/test/my-awesome-project/cisb-llm/queries/l-13__ub_pointer_offset_overflow
+baselineLinesOfCode: 16
+unicodeNewlines: false
+columnKind: utf8
+primaryLanguage: cpp
+creationMetadata:
+  cliVersion: 2.25.1
+  creationTime: 2026-05-12T03:33:17.330142478Z
+overlayBaseDatabase: false
+overlayDatabase: false
+finalised: true
