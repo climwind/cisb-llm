@@ -9,7 +9,7 @@
  */
 
 import cpp
-import IOMemoryBuiltinOptimization
+import query
 
 from VulnerableCallToBuiltinInIOAccessor call
 where hasNoVolatileAsmBarrier(call.getEnclosingFunction())

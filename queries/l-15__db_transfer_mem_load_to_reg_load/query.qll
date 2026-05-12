@@ -16,10 +16,8 @@ class MemOpFunction extends Function {
       name.matches("%memcpy") or
       name.matches("%strcpy")
     )
-    and
-    exists(Parameter p | p = this.getAParameter() | p.getIndex() = 0)  // has at least one parameter
-    and
-    this.getReturnType() instanceof VoidType = false  // not void
+
+
   }
 
   /**
@@ -36,12 +34,12 @@ class MemOpFunction extends Function {
 predicate returnsFirstParamDirectly(MemOpFunction f) {
   exists(ReturnStmt rs | rs.getEnclosingFunction() = f |
     exists(VariableAccess va | va = rs.getExpr() |
-      va.getTarget() = f.getFirstParam()
+      va.getTarget() = f.getParameter(0)
     )
   ) and
   not exists(ReturnStmt rs2 | rs2.getEnclosingFunction() = f |
     not (exists(VariableAccess va2 | va2 = rs2.getExpr() |
-      va2.getTarget() = f.getFirstParam()
+      va2.getTarget() = f.getParameter(0)
     ))
   )
 }
@@ -52,7 +50,7 @@ predicate returnsFirstParamDirectly(MemOpFunction f) {
 predicate firstParamModified(MemOpFunction f) {
   exists(AssignExpr a |
     a.getLValue() instanceof VariableAccess and
-    a.getLValue().(VariableAccess).getTarget() = f.getFirstParam() and
+    a.getLValue().(VariableAccess).getTarget() = f.getParameter(0) and
     a.getEnclosingFunction() = f
   )
 }
@@ -65,11 +63,11 @@ class ReturnRegisterMismatch extends MemOpFunction {
     not returnsFirstParamDirectly(this) and
     exists(ReturnStmt rs | rs.getEnclosingFunction() = this |
       not exists(VariableAccess va | va = rs.getExpr() |
-        va.getTarget() = this.getFirstParam()
+        va.getTarget() = this.getParameter(0)
       )
       or
       (exists(VariableAccess va | va = rs.getExpr() |
-        va.getTarget() = this.getFirstParam()
+        va.getTarget() = this.getParameter(0)
       ) and
       firstParamModified(this))
     )

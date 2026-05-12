@@ -13,7 +13,7 @@
  */
 
 import cpp
-import MemberAddressNullCheck
+import query
 
 from VulnerableLoop vl
 select vl, "Loop condition contains a null check on struct member address that Clang may optimize to always-true, potentially causing infinite loop."

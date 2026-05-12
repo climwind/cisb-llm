@@ -9,7 +9,7 @@
  */
 
 import cpp
-import ReturnRegisterMismatchLib
+import query
 
 from ReturnRegisterMismatch f
 select f, f.toString()

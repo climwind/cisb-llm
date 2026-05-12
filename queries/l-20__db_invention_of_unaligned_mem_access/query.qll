@@ -12,7 +12,7 @@ class VariableInSectionWithoutAlignment extends VariableDeclarationEntry {
     // storage: static or global
     (
       this.getDeclaration().isStatic() or
-      this.getDeclaration().isGlobal()
+      this.getDeclaration().isStatic()
     ) and
     // type is struct or union (including typedefs, etc.)
     this.getType().(DerivedType).getBaseType() instanceof Struct and

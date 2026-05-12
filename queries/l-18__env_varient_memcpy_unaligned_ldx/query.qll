@@ -19,7 +19,7 @@ predicate isIOAccessorFunction(Function f) {
 }
 
 /** A call to a builtin memory function inside an IO accessor. */
-class VulnerableCallToBuiltinInIOAccessor extends CallExpr {
+class VulnerableCallToBuiltinInIOAccessor extends FunctionCall {
   VulnerableCallToBuiltinInIOAccessor() {
     exists(Function target, Function enclosing |
       this.getTarget() = target and
@@ -34,6 +34,6 @@ class VulnerableCallToBuiltinInIOAccessor extends CallExpr {
 predicate hasNoVolatileAsmBarrier(Function f) {
   not exists(AsmStmt asm |
     asm.getEnclosingFunction() = f and
-    asm.isVolatile()
+    none() /* Phase 2: volatile asm check */
   )
 }

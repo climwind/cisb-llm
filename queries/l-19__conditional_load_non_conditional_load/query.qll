@@ -9,7 +9,7 @@ predicate writesToSharedVariable(Expr e) {
   exists(AssignExpr ass, VariableAccess va |
     e = ass and
     ass.getLValue() = va and
-    va.getTarget().isGlobalOrStatic()
+    va.getTarget().isStatic()
   )
   or
   // Function call like memset(), bzero() to a global/static variable
@@ -26,7 +26,7 @@ predicate writesToSharedVariable(Expr e) {
     ) and
     addr = call.getArgument(0) and
     addr.getOperand() = va and
-    va.getTarget().isGlobalOrStatic()
+    va.getTarget().isStatic()
   )
 }
 
@@ -36,11 +36,11 @@ predicate writesToSharedVariable(Expr e) {
  */
 predicate isConditionOnSyncVariable(Expr cond) {
   exists(Variable v |
-    cond.(RelationalExpr).getAnOperand().(VariableAccess).getTarget() = v and v.isGlobalOrStatic()
+    cond.(ComparisonOperation).getAnOperand().(VariableAccess).getTarget() = v and v.isStatic()
     or
-    cond.(NotExpr).getOperand().(VariableAccess).getTarget() = v and v.isGlobalOrStatic()
+    cond.(NotExpr).getOperand().(VariableAccess).getTarget() = v and v.isStatic()
     or
-    cond.(VariableAccess).getTarget() = v and v.isGlobalOrStatic()
+    cond.(VariableAccess).getTarget() = v and v.isStatic()
   )
 }
 
@@ -69,7 +69,7 @@ class ConditionalStore extends Expr {
       exists(VariableAccess va2 |
         this.getAChild*() = va2 and
         writtenVar = va2.getTarget() and
-        writtenVar.isGlobalOrStatic() and
+        writtenVar.isStatic() and
         writtenVar != syncVar
       )
     )

@@ -6,7 +6,7 @@ import cpp
  */
 predicate structLacksAlignmentAttribute(Struct t) {
   not exists(Attribute a |
-    a = t.getDecl().getADeclEntry().getAnAttribute() and
+    a = t.getAnAttribute() and
     (a.getName() = "packed" or a.getName() = "aligned" or
      a.getName() = "__packed__" or a.getName() = "__aligned__" or
      a.getName() = "gcc::packed" or a.getName() = "gcc::aligned"))
@@ -45,7 +45,7 @@ class PotentialUnalignedAccess extends Expr {
         or
         // Array access: p[i] where p is pointer to s
         exists(ArrayExpr ae |
-          ae.getArray().getType().stripType().(PointerType).getBaseType() = s and
+          ae.getArrayBase().getType().stripType().(PointerType).getBaseType() = s and
           this = ae
         )
       ) and

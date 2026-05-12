@@ -12,7 +12,7 @@
  */
 
 import cpp
-import query::UnalignedStructAccess
+import query
 
 from PotentialUnalignedAccess access, Struct s
 where access.getStruct() = s

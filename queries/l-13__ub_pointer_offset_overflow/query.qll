@@ -50,7 +50,7 @@ class VulnerableLoop extends Loop {
       cond = this.getCondition() and
       isNonNullCondition(cond, memberAddr) and
       fa = memberAddr.getFieldAccess() and
-      fa.getTarget().(DataMember).getByteOffset() > 0
+      fa.getTarget().getByteOffset() > 0
     )
   }
 

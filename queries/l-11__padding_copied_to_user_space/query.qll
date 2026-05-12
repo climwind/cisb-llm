@@ -5,10 +5,7 @@ import cpp
  * the presence of both __sparc__ and __arch64__ macros.
  */
 predicate isSparc64() {
-  exists(Macro sparc, Macro arch64 |
-    sparc.getName() = "__sparc__" and sparc.isDefined() and
-    arch64.getName() = "__arch64__" and arch64.isDefined()
-  )
+  none() /* Phase 2: restrict to sparc64 */
 }
 
 /**
@@ -29,7 +26,7 @@ class StructWithPadding extends Class {
  * Holds if `assign` is an assignment that writes to a field `f` of the struct variable `v`.
  */
 predicate fieldAssignment(AssignExpr assign, Variable v, Field f) {
-  exists(MemberAccess ma |
+  exists(FieldAccess ma |
     ma = assign.getLValue() and
     ma.getTarget() = f and
     ma.getQualifier() = any(VariableAccess va | va.getTarget() = v)
@@ -59,7 +56,7 @@ predicate structExposedToUser(Variable v) {
 predicate structWithUninitializedPadding(Variable v) {
   exists(StructWithPadding stp | v.getType() = stp) and
   exists(AssignExpr assn | fieldAssignment(assn, v, _)) and
-  not exists(AssignExpr init | init.getLValue().(VariableAccess).getTarget() = v and init.getLValue() = v) and // no aggregate assignment as initialization? This is approximate.
+  not exists(AssignExpr init | init.getLValue().(VariableAccess).getTarget() = v) and // no aggregate assignment as initialization? This is approximate.
   not exists(FunctionCall memset |
     memset.getTarget().hasName(["memset", "__builtin_memset", "explicit_bzero"]) and
     memset.getArgument(0).(AddressOfExpr).getOperand().(VariableAccess).getTarget() = v

@@ -11,7 +11,7 @@
  */
 
 import cpp
-import NullCheckEliminatedByAsmMemoryOperand
+import query
 
 from AsmStmt asm, NullCheckExpr check, Variable v
 where

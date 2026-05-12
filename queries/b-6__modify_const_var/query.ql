@@ -3,17 +3,14 @@
  * @description Writing to a const-qualified variable through a pointer cast invokes undefined behavior;
  *              compilers may optimize away the write based on assumed immutability.
  * @kind problem
+ * @problem.severity warning
  * @id cpp/const-variable-modification
- * @problem.severity high
- * @precision medium
  * @tags security
- *       correctness
  */
 
 import cpp
-import ConstVarModificationLibrary
+import query
 
-from ConstVarModification cvm, VariableDecl v
-where cvm.getModifiedVar() = v
-select cvm, "Modification of const variable '$@' via pointer cast. Declaration: $@.",
-  v, v.getName(), v, "defined here"
+from ConstVarModification cvm
+select cvm, "Const variable '$@' modified via pointer cast.",
+  cvm.getModifiedVar(), cvm.getModifiedVar().getName()

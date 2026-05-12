@@ -11,7 +11,7 @@
  */
 
 import cpp
-import ConditionalStoreLibrary
+import query
 
 from Expr store, Expr cond, Variable writtenVar, Variable syncVar
 where conditionalStoreQuery(store, cond, writtenVar, syncVar)

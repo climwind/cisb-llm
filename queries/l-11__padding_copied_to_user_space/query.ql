@@ -9,7 +9,7 @@
  */
 
 import cpp
-import sparc64PaddingLeakLibrary
+import query
 
 from Variable v
 where isSparc64() and structWithUninitializedPadding(v)

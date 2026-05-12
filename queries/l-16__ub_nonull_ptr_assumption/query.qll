@@ -10,7 +10,7 @@ import semmle.code.cpp.controlflow.Dominance
  * Holds if `expr` is a dereference of pointer variable `v`, accounting for casts and field access.
  */
 predicate pointerDerefOf(Expr expr, Variable v) {
-  exists(DereferenceExpr deref |
+  exists(PointerDereferenceExpr deref |
     deref = expr.getAChild*()
   |
     deref.getOperand().getAChild*() = any(VariableAccess va | va.getTarget() = v)
@@ -34,10 +34,7 @@ predicate pointerDerefOf(Expr expr, Variable v) {
  * (constraint containing 'm') whose expression dereferences variable `v`.
  */
 predicate asmMemoryDerefOperand(AsmStmt asm, Variable v) {
-  exists(AsmOperand operand | operand = asm.getAnOperand() |
-    (operand.getConstraint().matches("=*m*") or operand.getConstraint().matches("*m*")) and
-    pointerDerefOf(operand.getExpression(), v)
-  )
+  exists(Expr e | e = asm.getAChild*() | pointerDerefOf(e, v))
 }
 
 /**
@@ -69,11 +66,7 @@ class NullCheckExpr extends Expr {
         )
         or
         // !v
-        exists(NotExpr not | not = this and not.getOperand().getAChild*() = any(VariableAccess va | va.getTarget() = v))
-        or
-        // if(v) - implicit conversion to bool
-        exists(ImplicitConversion conv | conv = this and conv.getExpr().getAChild*() = any(VariableAccess va | va.getTarget() = v) and
-          conv.getType() instanceof BoolType)
+        exists(NotExpr ne | ne = this and ne.getOperand().getAChild*() = any(VariableAccess va | va.getTarget() = v))
       )
     )
   }
@@ -86,7 +79,7 @@ class NullCheckExpr extends Expr {
  * and the asm dominates the null check in the control flow graph.
  */
 predicate asmDominatesNullCheck(AsmStmt asm, NullCheckExpr check) {
-  asm.getFunction() = check.getFunction() and
-  asm.getLocation() < check.getLocation() and
+  asm.getEnclosingFunction() = check.getEnclosingFunction() and
+  asm.getLocation().getStartLine() < check.getLocation().getStartLine() and
   dominates(asm, check)
 }
