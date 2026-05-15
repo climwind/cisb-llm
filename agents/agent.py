@@ -46,8 +46,14 @@ class Agent:
 
         if hasattr(response, "choices") and response.choices:
             message = getattr(response.choices[0], "message", None)
-            if message is not None and getattr(message, "content", None):
-                return message.content
+            if message is not None:
+                content = getattr(message, "content", None)
+                if content:
+                    return content
+                # DeepSeek reasoning models may put answer in reasoning_content
+                reasoning = getattr(message, "reasoning_content", None)
+                if reasoning:
+                    return reasoning
 
         output = getattr(response, "output", None)
         if output:
@@ -110,8 +116,20 @@ class Agent:
                 )
                 return self.extract_text(response)
             except Exception as exc:
-                # Fall back to plain text generation and parse the JSON payload.
                 last_error = exc
+
+            # Fallback: plain text without json_object (for APIs that don't support it)
+            try:
+                response = client.chat.completions.create(
+                    model=self.model,
+                    messages=messages,
+                    temperature=temperature,
+                    max_tokens=max(max_tokens, 8192),
+                    extra_body=extra_body if extra_body else {"enable_thinking": False},
+                )
+                return self.extract_text(response)
+            except Exception:
+                pass
 
         try:
             if hasattr(client, "responses"):
@@ -124,7 +142,10 @@ class Agent:
                     stream=False,
                 )
                 return self.extract_text(response)
+        except Exception:
+            pass
 
+        try:
             response = client.chat.completions.create(
                 model=self.model,
                 messages=messages,

@@ -30,7 +30,6 @@ You must return one JSON object, and the top-level keys must be exactly:
   "triggers": ["string"],
   "vulnerable_pattern": "string",
   "ql_constraints": "string",
-  "equivalence_notes": ["string"],
   "scope_assumptions": ["string"],
   "control_flow_assumptions": ["string"],
   "environment_assumptions": ["string"]
@@ -142,7 +141,6 @@ def render_spec_markdown(spec_json, bundle, model_name):
         "triggers": spec_json.get("triggers", []),
         "vulnerable_pattern": spec_json.get("vulnerable_pattern", ""),
         "ql_constraints": spec_json.get("ql_constraints", ""),
-        "equivalence_notes": spec_json.get("equivalence_notes", []),
         "scope_assumptions": spec_json.get("scope_assumptions", []),
         "control_flow_assumptions": spec_json.get("control_flow_assumptions", []),
         "environment_assumptions": spec_json.get("environment_assumptions", []),
